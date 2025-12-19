@@ -1,0 +1,212 @@
+# ---------------------------------------------------------------
+# Project Specifics
+# ---------------------------------------------------------------
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_OFFSET=0x8000
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=4096
+
+# Flash Size
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+
+# ---------------------------------------------------------------
+# Compiler & Linker Optimization
+# ---------------------------------------------------------------
+# Optimize for size (-Os)
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+CONFIG_COMPILER_OPTIMIZATION_DEFAULT=n
+CONFIG_COMPILER_OPTIMIZATION_PERF=n
+
+# Disable assertions (removes file paths and condition strings)
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_DISABLE=y
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_ENABLE=n
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=n
+
+# Remove headers and file paths from binary
+CONFIG_COMPILER_HIDE_PATHS_MACROS=y
+
+# ---------------------------------------------------------------
+# Logging (Silence everything for max space savings)
+# ---------------------------------------------------------------
+CONFIG_LOG_DEFAULT_LEVEL_NONE=y
+CONFIG_LOG_DEFAULT_LEVEL=0
+CONFIG_LOG_MAXIMUM_LEVEL=0
+CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
+
+# These to enable logging
+# CONFIG_LOG_DEFAULT_LEVEL_NONE=n
+# CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+# CONFIG_LOG_DEFAULT_LEVEL=3
+# CONFIG_LOG_MAXIMUM_LEVEL=3
+# CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
+# CONFIG_BOOTLOADER_LOG_LEVEL=2
+
+# ---------------------------------------------------------------
+# Bluetooth / NimBLE Optimization
+# ---------------------------------------------------------------
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_CONTROLLER_DISABLED=n
+CONFIG_BT_BLUEDROID_ENABLED=n
+
+# Disable unused roles (You are a Server, so you don't need Central/Scan)
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
+CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
+
+# Reduce Max Connections/Bonds to minimum required (1 connection is enough for OTA)
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+CONFIG_BT_NIMBLE_MAX_BONDS=1
+CONFIG_BT_NIMBLE_MAX_CCCDS=4
+CONFIG_BTDM_CTRL_BLE_MAX_CONN=1
+CONFIG_BTDM_CTRL_BLE_MAX_CONN_EFF=1
+
+# Disable NimBLE Logging
+CONFIG_BT_NIMBLE_LOG_LEVEL_NONE=y
+CONFIG_NIMBLE_CPP_LOG_LEVEL_NONE=y
+
+# Memory tuning
+CONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=12
+CONFIG_BT_NIMBLE_ACL_BUF_COUNT=12
+CONFIG_BT_NIMBLE_ACL_BUF_SIZE=255
+CONFIG_BT_NIMBLE_HCI_EVT_BUF_SIZE=70
+CONFIG_BT_NIMBLE_HCI_EVT_HI_BUF_COUNT=30
+CONFIG_BT_NIMBLE_HCI_EVT_LO_BUF_COUNT=8
+
+# ---------------------------------------------------------------
+# Networking (LwIP / MbedTLS)
+# ---------------------------------------------------------------
+# Disable IPv6 (Saves ~40-60KB if you only use IPv4)
+CONFIG_LWIP_IPV6=n
+
+# Reduce TCP Buffer sizes
+CONFIG_LWIP_TCP_MSS=536
+CONFIG_LWIP_TCP_WND_DEFAULT=2144
+CONFIG_LWIP_TCP_SND_BUF_DEFAULT=2144
+
+# MbedTLS Optimization
+# Disable Certificate Bundle (You are likely not validating external root CAs for local OTA)
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=n
+
+# Disable unnecessary hardware acceleration wrappers if not used heavily
+CONFIG_MBEDTLS_HARDWARE_MPI=n
+
+# ---------------------------------------------------------------
+# System / FreeRTOS
+# ---------------------------------------------------------------
+# Use Nano formatting for printf (smaller, no float support by default)
+CONFIG_NEWLIB_NANO_FORMAT=y
+
+# Panic handler: Print minimal info and reboot (saves decoding logic)
+CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y
+CONFIG_ESP_SYSTEM_PANIC_GDBSTUB=n
+
+# Disable Stack Smashing Protection (Saves space, slightly less secure)
+CONFIG_COMPILER_STACK_CHECK_MODE_NONE=y
+
+# Disable WPA3 (SAE) - Saves significant space if using WPA2
+CONFIG_ESP_WIFI_ENABLE_WPA3_SAE=n
+CONFIG_ESP_WIFI_ENABLE_WPA3_OWE_STA=n
+CONFIG_ESP_WIFI_ENABLE_SAE_PK=n
+
+# Disable WPA Enterprise (802.1x) - You are using PSK
+CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n
+
+# Disable WiFi Mesh
+CONFIG_ESP_WIFI_MESH_SUPPORT=n
+
+# Disable SoftAP support (Your code only uses Station mode)
+CONFIG_ESP_WIFI_SOFTAP_SUPPORT=n
+
+# Disable C++ Exceptions (Your code uses std::string but will abort on error instead of throw)
+CONFIG_COMPILER_CXX_EXCEPTIONS=n
+
+# Disable RTTI (Run Time Type Info)
+CONFIG_COMPILER_CXX_RTTI=n
+
+# Disable Ethernet Drivers
+CONFIG_ETH_ENABLED=n
+CONFIG_ETH_USE_ESP32_EMAC=n
+CONFIG_ETH_USE_SPI_ETHERNET=n
+
+# Store PHY calibration data in NVS only (saves code space for init data)
+CONFIG_ESP_PHY_INIT_DATA_IN_PARTITION=n
+CONFIG_ESP_PHY_CALIBRATION_AND_DATA_STORAGE=n
+
+# Disable LwIP mDNS (Your code uses manual UDP sockets, not mDNS service discovery)
+CONFIG_LWIP_DNS_SUPPORT_MDNS_QUERIES=n
+
+# Filesystem Support (If you don't use VFS for anything other than specific calls)
+# You use standard sockets, but if you don't use "fopen" on spiffs:
+CONFIG_VFS_SUPPORT_IO=n
+
+# =================================================
+# CRYPTO / MBEDTLS (MINIMAL TO PASS BUILD)
+# =================================================
+# We must enable TLS to satisfy internal dependency checks
+CONFIG_MBEDTLS_TLS_ENABLED=y
+CONFIG_MBEDTLS_TLS_CLIENT=y
+CONFIG_MBEDTLS_TLS_SERVER=n
+
+# Enable ONLY TLS 1.2 to satisfy mbedtls/check_config.h
+CONFIG_MBEDTLS_SSL_PROTO_TLS1_2=y
+CONFIG_MBEDTLS_SSL_PROTO_TLS1_3=n
+CONFIG_MBEDTLS_SSL_PROTO_DTLS=n
+CONFIG_MBEDTLS_SSL_ALPN=n
+CONFIG_MBEDTLS_SSL_SESSION_TICKETS=n
+
+# Enable ONLY RSA to satisfy "no key exchange methods" error
+CONFIG_MBEDTLS_KEY_EXCHANGE_RSA=y
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_RSA=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDH_ECDSA=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDH_RSA=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_DHE_RSA=n
+CONFIG_MBEDTLS_PKCS7_C=n
+
+# Keep raw crypto needed for WPA2 / OTA Checksums
+CONFIG_MBEDTLS_AES_C=y
+CONFIG_MBEDTLS_SHA256_C=y
+CONFIG_MBEDTLS_MD5_C=y
+CONFIG_MBEDTLS_CMAC_C=y
+
+# Disable PEM Parsing (Doing binary OTA, not parsing Certs/Keys)
+# This saves significant space in mbedTLS
+CONFIG_MBEDTLS_PEM_PARSE_C=n
+CONFIG_MBEDTLS_PEM_WRITE_C=n
+CONFIG_MBEDTLS_X509_CRL_PARSE_C=n
+CONFIG_MBEDTLS_X509_CSR_PARSE_C=n
+
+# =================================================
+# DISABLE HTTPS (CRITICAL FOR SIZE)
+# =================================================
+# Disabling these ensures the TLS code enabled above is never 
+# referenced, allowing the Linker to strip it out.
+CONFIG_ESP_HTTPS_SERVER_ENABLE=n
+CONFIG_ESP_HTTP_CLIENT_ENABLE_HTTPS=n
+CONFIG_ESP_HTTP_CLIENT_ENABLE_BASIC_AUTH=n
+CONFIG_ESP_HTTP_CLIENT_ENABLE_DIGEST_AUTH=n
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=128
+CONFIG_HTTPD_MAX_URI_LEN=128
+
+# ---------------------------------------------------------------
+# Filesystem Stripping (No SPIFFS/LittleFS/FATFS)
+# ---------------------------------------------------------------
+# Set Max Partitions to 0 to prevent SPIFFS driver compilation
+CONFIG_SPIFFS_MAX_PARTITIONS=0
+CONFIG_SPIFFS_CACHE=n
+CONFIG_SPIFFS_PAGE_CHECK=n
+CONFIG_SPIFFS_GC_MAX_RUNS=0
+CONFIG_SPIFFS_USE_MAGIC=n
+CONFIG_SPIFFS_USE_MTIME=n
+
+# Disable FATFS Volumes and Codepages
+CONFIG_FATFS_VOLUME_COUNT=0
+CONFIG_FATFS_CODEPAGE_437=n
+CONFIG_FATFS_LFN_NONE=y
+CONFIG_FATFS_PER_FILE_CACHE=n
+
+# Disable VFS Directory Support (opendir/readdir/mkdir)
+CONFIG_VFS_SUPPORT_DIR=n
