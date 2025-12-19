@@ -1,10 +1,18 @@
 dependencies:
+  h2zero/esp-nimble-cpp:
+    component_hash: 53a8a861abde49ee21f687477709344fa4cee34cea38b475177648165fa9f859
+    dependencies: []
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 2.3.3
   idf:
     source:
       type: idf
-    version: 5.4.0
+    version: 5.1.4
 direct_dependencies:
+- h2zero/esp-nimble-cpp
 - idf
-manifest_hash: f1382880dcd827bd4e5ebed856d17f72856699ce0c68d3517550c25ebfd9b9a2
+manifest_hash: dffe3b2d23d0976283c0028b80b054c007a345ae807bb7282dba3572ec399404
 target: esp32s3
 version: 2.0.0

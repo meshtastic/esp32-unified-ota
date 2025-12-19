@@ -3,6 +3,8 @@ dependencies:
   ## Required IDF version
   idf:
     version: ">=4.1.0"
+  h2zero/esp-nimble-cpp:
+    version: ">=1.4.1"
   # # Put list of dependencies here
   # # For components maintained by Espressif:
   # component: "~1.0.0"
