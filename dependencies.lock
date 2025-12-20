@@ -1,18 +1,17 @@
 dependencies:
-  h2zero/esp-nimble-cpp:
-    component_hash: 53a8a861abde49ee21f687477709344fa4cee34cea38b475177648165fa9f859
+  esp-nimble-cpp:
     dependencies: []
     source:
-      registry_url: https://components.espressif.com/
-      type: service
+      path: /Users/jake/Meshtastic/firmware-ota-idf/components/esp-nimble-cpp
+      type: local
     version: 2.3.3
   idf:
     source:
       type: idf
-    version: 5.1.4
+    version: 5.4.0
 direct_dependencies:
 - h2zero/esp-nimble-cpp
 - idf
-manifest_hash: dffe3b2d23d0976283c0028b80b054c007a345ae807bb7282dba3572ec399404
+manifest_hash: 0c0297b0fb4486bdb635c0b93386951c14486774208f741880dce4931d2c89cc
 target: esp32s3
 version: 2.0.0

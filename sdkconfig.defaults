@@ -1,16 +1,4 @@
 # ---------------------------------------------------------------
-# Project Specifics
-# ---------------------------------------------------------------
-CONFIG_PARTITION_TABLE_CUSTOM=y
-CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
-CONFIG_PARTITION_TABLE_OFFSET=0x8000
-CONFIG_ESP_MAIN_TASK_STACK_SIZE=4096
-
-# Flash Size
-CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
-CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
-
-# ---------------------------------------------------------------
 # Compiler & Linker Optimization
 # ---------------------------------------------------------------
 # Optimize for size (-Os)
@@ -33,14 +21,6 @@ CONFIG_LOG_DEFAULT_LEVEL_NONE=y
 CONFIG_LOG_DEFAULT_LEVEL=0
 CONFIG_LOG_MAXIMUM_LEVEL=0
 CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
-
-# These to enable logging
-# CONFIG_LOG_DEFAULT_LEVEL_NONE=n
-# CONFIG_LOG_DEFAULT_LEVEL_INFO=y
-# CONFIG_LOG_DEFAULT_LEVEL=3
-# CONFIG_LOG_MAXIMUM_LEVEL=3
-# CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
-# CONFIG_BOOTLOADER_LOG_LEVEL=2
 
 # ---------------------------------------------------------------
 # Bluetooth / NimBLE Optimization
@@ -89,7 +69,6 @@ CONFIG_LWIP_TCP_SND_BUF_DEFAULT=2144
 # MbedTLS Optimization
 # Disable Certificate Bundle (You are likely not validating external root CAs for local OTA)
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=n
-
 # Disable unnecessary hardware acceleration wrappers if not used heavily
 CONFIG_MBEDTLS_HARDWARE_MPI=n
 
@@ -105,6 +84,19 @@ CONFIG_ESP_SYSTEM_PANIC_GDBSTUB=n
 
 # Disable Stack Smashing Protection (Saves space, slightly less secure)
 CONFIG_COMPILER_STACK_CHECK_MODE_NONE=y
+
+# ---------------------------------------------------------------
+# Project Specifics
+# ---------------------------------------------------------------
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_OFFSET=0x8000
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=4096
+
+# Flash Size
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+
 
 # Disable WPA3 (SAE) - Saves significant space if using WPA2
 CONFIG_ESP_WIFI_ENABLE_WPA3_SAE=n
@@ -128,19 +120,10 @@ CONFIG_COMPILER_CXX_RTTI=n
 
 # Disable Ethernet Drivers
 CONFIG_ETH_ENABLED=n
-CONFIG_ETH_USE_ESP32_EMAC=n
-CONFIG_ETH_USE_SPI_ETHERNET=n
 
 # Store PHY calibration data in NVS only (saves code space for init data)
 CONFIG_ESP_PHY_INIT_DATA_IN_PARTITION=n
-CONFIG_ESP_PHY_CALIBRATION_AND_DATA_STORAGE=n
-
-# Disable LwIP mDNS (Your code uses manual UDP sockets, not mDNS service discovery)
-CONFIG_LWIP_DNS_SUPPORT_MDNS_QUERIES=n
-
-# Filesystem Support (If you don't use VFS for anything other than specific calls)
-# You use standard sockets, but if you don't use "fopen" on spiffs:
-CONFIG_VFS_SUPPORT_IO=n
+CONFIG_ESP_PHY_CALIBRATION_AND_DATA_STORAGE=y
 
 # =================================================
 # CRYPTO / MBEDTLS (MINIMAL TO PASS BUILD)
@@ -172,41 +155,11 @@ CONFIG_MBEDTLS_SHA256_C=y
 CONFIG_MBEDTLS_MD5_C=y
 CONFIG_MBEDTLS_CMAC_C=y
 
-# Disable PEM Parsing (Doing binary OTA, not parsing Certs/Keys)
-# This saves significant space in mbedTLS
-CONFIG_MBEDTLS_PEM_PARSE_C=n
-CONFIG_MBEDTLS_PEM_WRITE_C=n
-CONFIG_MBEDTLS_X509_CRL_PARSE_C=n
-CONFIG_MBEDTLS_X509_CSR_PARSE_C=n
-
 # =================================================
 # DISABLE HTTPS (CRITICAL FOR SIZE)
 # =================================================
 # Disabling these ensures the TLS code enabled above is never 
 # referenced, allowing the Linker to strip it out.
-CONFIG_ESP_HTTPS_SERVER_ENABLE=n
 CONFIG_ESP_HTTP_CLIENT_ENABLE_HTTPS=n
 CONFIG_ESP_HTTP_CLIENT_ENABLE_BASIC_AUTH=n
 CONFIG_ESP_HTTP_CLIENT_ENABLE_DIGEST_AUTH=n
-CONFIG_HTTPD_MAX_REQ_HDR_LEN=128
-CONFIG_HTTPD_MAX_URI_LEN=128
-
-# ---------------------------------------------------------------
-# Filesystem Stripping (No SPIFFS/LittleFS/FATFS)
-# ---------------------------------------------------------------
-# Set Max Partitions to 0 to prevent SPIFFS driver compilation
-CONFIG_SPIFFS_MAX_PARTITIONS=0
-CONFIG_SPIFFS_CACHE=n
-CONFIG_SPIFFS_PAGE_CHECK=n
-CONFIG_SPIFFS_GC_MAX_RUNS=0
-CONFIG_SPIFFS_USE_MAGIC=n
-CONFIG_SPIFFS_USE_MTIME=n
-
-# Disable FATFS Volumes and Codepages
-CONFIG_FATFS_VOLUME_COUNT=0
-CONFIG_FATFS_CODEPAGE_437=n
-CONFIG_FATFS_LFN_NONE=y
-CONFIG_FATFS_PER_FILE_CACHE=n
-
-# Disable VFS Directory Support (opendir/readdir/mkdir)
-CONFIG_VFS_SUPPORT_DIR=n

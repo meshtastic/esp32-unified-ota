@@ -1,5 +1,10 @@
 idf_component_register(
-    SRCS "main.cpp"
+    SRCS
+        "main.cpp"
+        "nvs_config.cpp"
+        "wifi_app.cpp"
+        "net_ota.cpp"
+        "ble_ota.cpp"
     INCLUDE_DIRS "."
     REQUIRES 
         nvs_flash 
