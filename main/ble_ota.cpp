@@ -22,7 +22,6 @@ static bool deviceConnected = false;
 static bool oldDeviceConnected = false;
 static esp_ota_handle_t otaHandler = 0;
 static const esp_partition_t *update_partition = NULL;
-static uint8_t txValue = 0;
 static int bufferCount = 0;
 static size_t ota_size = 0;
 static size_t total_received = 0;
@@ -34,6 +33,13 @@ static std::string getDeviceName() {
     char name[20];
     snprintf(name, sizeof(name), "Meshtastic_%02x%02x", mac[4], mac[5]);
     return std::string(name);
+}
+
+void notifyStatus(bleota_status_t newState) {
+    // Cast the enum class value to its underlying type (uint8_t)
+    uint8_t statusByte = static_cast<uint8_t>(newState);
+    pTxCharacteristic->setValue(&statusByte, 1); // Pass address of uint8_t and size 1
+    pTxCharacteristic->notify();
 }
 
 class MyServerCallbacks : public BLEServerCallbacks {
@@ -51,9 +57,11 @@ class MyServerCallbacks : public BLEServerCallbacks {
        allowed to skip. Timeout: 10 millisecond increments, try for 5x interval
        time for best results.
         */
+
         pServer->updateConnParams(connInfo.getConnHandle(), 12, 12, 2, 100);
         deviceConnected = true;
-        deviceConnected = true;
+
+        notifyStatus(WAITING_FOR_SIZE);
     }
     void onDisconnect(BLEServer *pServer, NimBLEConnInfo& connInfo, int reason) override {
         deviceConnected = false;
@@ -86,6 +94,31 @@ class otaCallback : public BLECharacteristicCallbacks {
         // Convert the remaining string to an integer
         ota_size = std::stoul(sizeStr);
         INFO("OTA size: %d\n\r", ota_size);
+
+        notifyStatus(ERASING_FLASH);
+
+        update_partition = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, NULL);
+        if (update_partition == NULL) {
+          FAIL("Could not find update partition.");
+          notifyStatus(ERROR);
+        }
+
+        INFO("Writing to partition subtype %d at offset 0x%lx \n\r",
+                    update_partition->subtype, update_partition->address);
+
+        // Safety: Set boot partition to current before starting, in case of power loss
+        // Think about when we want to lock the user into this bootloader.
+        // Once the erase starts, there's no going back!
+        const esp_partition_t *running = esp_ota_get_running_partition();
+        esp_ota_set_boot_partition(running);
+
+        if (esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &otaHandler) != ESP_OK) {
+          cleanUp();
+          return;
+        }
+
+        notifyStatus(READY_FOR_CHUNK);
+        downloadFlag = true;
       }
       return;
     }
@@ -96,47 +129,17 @@ class otaCallback : public BLECharacteristicCallbacks {
     INFO("Progress R: %d T: %d C: %d B: %x\n\r", total_received,
                   ota_size, rxData.length(), firstByte);
 
-    if (!downloadFlag && ota_size > 0) {
-      // First BLE bytes have arrived
-
-      update_partition = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, NULL);
-      if (update_partition == NULL) {
-        FAIL("PARTITION IS NULL") ;
-      }
-
-      INFO("Writing to partition subtype %d at offset 0x%lx \n\r",
-                    update_partition->subtype, update_partition->address);
-
-      // esp_ota_begin can take a while to complete as it erase the flash
-      // partition (3-5 seconds) so make sure there's no timeout on the client
-      // side that triggers before that.
-      esp_task_wdt_config_t wdt_config = {
-        .timeout_ms = 10000,
-        .idle_core_mask = (1 << 0), // Watch Core 0
-        .trigger_panic = false
-      };
-      esp_task_wdt_init(&wdt_config);
-      esp_task_wdt_add(NULL); // Add current task to WDT
-
-      if (esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &otaHandler) !=
-          ESP_OK) {
-        cleanUp();
-        return;
-      }
-      downloadFlag = true;
-    }
-
     if (bufferCount >= 1 || rxData.length() > 0) {
       if (esp_ota_write(otaHandler, (uint8_t *)rxData.c_str(),
                         rxData.length()) != ESP_OK) {
         INFO("Error: write to flash failed");
+        notifyStatus(ERROR);
         cleanUp();
         return;
       } else {
         bufferCount = 1;
         // Notify the app so next batch can be sent
-        pTxCharacteristic->setValue(&txValue, 1);
-        pTxCharacteristic->notify();
+        notifyStatus(CHUNK_ACK);
       }
 
       // check if this was the last data chunk? If so, finish the OTA update
@@ -146,6 +149,7 @@ class otaCallback : public BLECharacteristicCallbacks {
         // the length of total file is correct
         if (esp_ota_end(otaHandler) != ESP_OK) {
           INFO("OTA end failed ");
+          notifyStatus(ERROR);
           cleanUp();
           return;
         }
@@ -154,6 +158,7 @@ class otaCallback : public BLECharacteristicCallbacks {
         // update was successful
         INFO("Set Boot partion");
         if (ESP_OK == esp_ota_set_boot_partition(update_partition)) {
+          notifyStatus(OTA_COMPLETE);
           esp_ota_end(otaHandler);
           cleanUp();
           nvs_reset_meshtastic_counter();
@@ -164,12 +169,14 @@ class otaCallback : public BLECharacteristicCallbacks {
         } else {
           // Something whent wrong, the upload was not successful
           INFO("Upload Error");
+          notifyStatus(ERROR);
           cleanUp();
           esp_ota_end(otaHandler);
           return;
         }
       }
     } else {
+      notifyStatus(ERROR);
       cleanUp();
     }
   }

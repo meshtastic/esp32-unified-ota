@@ -1,11 +1,11 @@
-// 1. System Includes FIRST
+// System Includes
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_netif.h"
 #include "esp_event.h"
 #include "esp_system.h"
 
-// 2. Project Includes SECOND
+// Project Includes
 #include "common_log.h"
 #include "nvs_config.h"
 #include "wifi_app.h"
@@ -14,12 +14,16 @@
 
 #define TAG "MAIN"
 
+
 extern "C" void app_main(void) {
 
-    
-    nvs_init_custom("ota-wifi");
-    INFO("\n\n//\\ E S H T /\\ S T / C OTA\n\n");
-    INFO("Booting...");
+    esp_netif_init();
+    esp_event_loop_create_default();
+
+    nvs_init_custom("MeshtasticOTA");
+
+    INFO("\n\n//\\ E S H T /\\ S T / C\n\n");
+    INFO("OTA Loader\n\nBooting...");
     
     wifi_credentials_t config;
     nvs_read_config(&config);
@@ -36,7 +40,7 @@ extern "C" void app_main(void) {
     } else {
         INFO("Mode: BLE OTA");
         
-        // Create the task with 8KB stack to prevent overflow
+        // Create the task with 8KB stack to prevent overflow (might be uncessary)
         xTaskCreate(ble_ota_task, "ble_ota_task", 8192, NULL, 5, NULL);
     }
 }
