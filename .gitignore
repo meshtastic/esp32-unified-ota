@@ -1,5 +1,5 @@
 build/*
-main/build/*
+src/build/*
 .DS_Store
 .pio/
 managed_components/

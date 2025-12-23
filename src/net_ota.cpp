@@ -8,9 +8,10 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #include "lwip/sockets.h"
-#include "mbedtls/md5.h"
+#include "mbedtls/sha256.h"
 #include <cstring>
 #include <cstdio>
+#include "utils.h"
 
 #define TAG "NET_OTA"
 #define OK "OK"
@@ -23,12 +24,12 @@ typedef struct {
     in_port_t remote_port;
     struct sockaddr_in remote_ctrl_addr;
     size_t firmware_size;
-    uint8_t firmware_md5[16];
+    uint8_t firmware_hash[32];  // Full 32-byte SHA-256 hash
     espota_cmd_t cmd;
 } ota_config_t;
 
-static bool md5_string_to_bytes(const char *hex, uint8_t *bytes) {
-    for (int i = 0; i < 16; ++i) {
+static bool hash_string_to_bytes(const char *hex, uint8_t *bytes) {
+    for (int i = 0; i < 32; ++i) {  // Now 32 bytes instead of 16
         unsigned int byte = 0;
         if (sscanf(&hex[i * 2], "%02x", &byte) != 1) return false;
         bytes[i] = (uint8_t)byte;
@@ -40,15 +41,15 @@ static void ota_parse_config(const char *buffer, ota_config_t *config) {
     int command = 0;
     unsigned int remote_port = 0;
     unsigned int firmware_size = 0;
-    char md5[33] = { 0 };
-    int res = sscanf(buffer, "%d %u %u %32s", &command, &remote_port, &firmware_size, md5);
+    char hash_hex[65] = { 0 };  // 64 hex chars + null terminator
+    int res = sscanf(buffer, "%d %u %u %64s", &command, &remote_port, &firmware_size, hash_hex);
     if (res != 4) FAIL("Invalid header format");
     config->cmd = (espota_cmd_t)command;
     config->remote_port = htons(remote_port);
     config->firmware_size = firmware_size;
-    uint8_t md5_bytes[16];
-    if (!md5_string_to_bytes(md5, md5_bytes)) FAIL("Invalid MD5 string");
-    memcpy(config->firmware_md5, md5_bytes, sizeof(md5_bytes));
+    uint8_t hash_bytes[32];
+    if (!hash_string_to_bytes(hash_hex, hash_bytes)) FAIL("Invalid SHA-256 hash string");
+    memcpy(config->firmware_hash, hash_bytes, sizeof(hash_bytes));
 }
 
 void start_network_ota_process() {
@@ -70,11 +71,9 @@ void start_network_ota_process() {
     struct timeval timeout = { .tv_sec = 120, .tv_usec = 0 };
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
-    // Reserve 1 byte for null terminator so sscanf doesn't overflow
     int len = recvfrom(sock, buffer, sizeof(buffer) - 1, 0, (struct sockaddr *)&source_addr, &source_len);
     if (len < 0) FAIL("Timeout waiting for OTA");
     
-    // Null terminate buffer for string parsing
     buffer[len] = 0; 
 
     ota_config_t config;
@@ -85,29 +84,20 @@ void start_network_ota_process() {
     esp_ota_handle_t update_handle = 0;
 
     if (config.cmd == ESPOTA_CMD_FLASH) {
-        // PER REQUEST: Always targeting OTA_0
         part_target = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, NULL);
         if (!part_target) FAIL("OTA_0 partition not found");
 
         INFO("Starting OTA on partition subtype %d at offset 0x%lx", part_target->subtype, part_target->address);
 
-        // Confirm invitation (UDP ACK)
         sendto(sock, "ERASE", 5, 0, (struct sockaddr *)&source_addr, sizeof(source_addr));
 
-        // Safety: Set boot partition to current before starting, in case of power loss
-        // Think about when we want to lock the user into this bootloader.
-        // Once the erase starts, there's no going back!
         const esp_partition_t *running = esp_ota_get_running_partition();
         esp_ota_set_boot_partition(running);
 
-        // esp_ota_begin handles erasing based on config.firmware_size
         if (esp_ota_begin(part_target, config.firmware_size, &update_handle) != ESP_OK) {
             FAIL("esp_ota_begin failed");
         }
     } else {
-        // SPIFFS/LittleFS UPDATE
-        // Note: We cannot use esp_ota_begin/write for SPIFFS because esp_ota validates 
-        // app image headers which file systems do not have. We stick to partition ops here.
         part_target = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, NULL);
         if (!part_target) FAIL("SPIFFS partition not found");
 
@@ -115,12 +105,10 @@ void start_network_ota_process() {
         esp_partition_erase_range(part_target, 0, part_target->size);
     }
 
-    // Connect Data TCP Socket
     int data_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
     struct sockaddr_in data_addr = source_addr;
     data_addr.sin_port = config.remote_port;
     
-    // Confirm invitation (UDP ACK)
     sendto(sock, OK, OK_LEN, 0, (struct sockaddr *)&source_addr, sizeof(source_addr));
     
     vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -128,14 +116,14 @@ void start_network_ota_process() {
         if (config.cmd == ESPOTA_CMD_FLASH) esp_ota_abort(update_handle);
         FAIL("Connect failed");
     }
-    closesocket(sock); // Close UDP control
+    closesocket(sock);
 
-    // MbedTLS 3.x / IDF 5.x syntax
-    mbedtls_md5_context ctx;
-    mbedtls_md5_init(&ctx);
-    if (mbedtls_md5_starts(&ctx) != 0) { // No _ret in MbedTLS 3
+    // SHA-256 context
+    mbedtls_sha256_context ctx;
+    mbedtls_sha256_init(&ctx);
+    if (mbedtls_sha256_starts(&ctx, 0) != 0) {  // 0 = SHA-256
         if (config.cmd == ESPOTA_CMD_FLASH) esp_ota_abort(update_handle);
-        FAIL("MD5 init failed");
+        FAIL("SHA-256 init failed");
     }
 
     size_t total = 0;
@@ -146,19 +134,17 @@ void start_network_ota_process() {
         int r = recv(data_sock, buffer, want, 0);
         if (r <= 0) break;
         
-        // Update hash
-        if (mbedtls_md5_update(&ctx, (unsigned char*)buffer, r) != 0) {
+        // Update SHA-256 hash
+        if (mbedtls_sha256_update(&ctx, (unsigned char*)buffer, r) != 0) {
             if (config.cmd == ESPOTA_CMD_FLASH) esp_ota_abort(update_handle);
-            FAIL("MD5 update failed");
+            FAIL("SHA-256 update failed");
         }
         
         // Write to flash
         esp_err_t write_err = ESP_OK;
         if (config.cmd == ESPOTA_CMD_FLASH) {
-            // Use OTA API for App
             write_err = esp_ota_write(update_handle, buffer, r);
         } else {
-            // Use Partition API for SPIFFS
             write_err = esp_partition_write(part_target, total, buffer, r);
         }
 
@@ -172,34 +158,36 @@ void start_network_ota_process() {
 
     if (total != config.firmware_size) {
         if (config.cmd == ESPOTA_CMD_FLASH) esp_ota_abort(update_handle);
+        corrupt_partition(part_target);
         FAIL("Incomplete firmware image %d of %d", total, config.firmware_size);
+        return;
     }
     
-    uint8_t digest[16];
-    if (mbedtls_md5_finish(&ctx, digest) != 0) {
+    uint8_t digest[32];
+    if (mbedtls_sha256_finish(&ctx, digest) != 0) {
         if (config.cmd == ESPOTA_CMD_FLASH) esp_ota_abort(update_handle);
-        FAIL("MD5 finish failed");
+        corrupt_partition(part_target);
+        FAIL("SHA-256 finish failed");
+        return;
     }
-    mbedtls_md5_free(&ctx); 
+    mbedtls_sha256_free(&ctx); 
     
-    // Compare Hash
-    if (memcmp(digest, config.firmware_md5, 16) != 0) {
+    // Compare full 32-byte SHA-256 hash
+    if (memcmp(digest, config.firmware_hash, 32) != 0) {
         if (config.cmd == ESPOTA_CMD_FLASH) esp_ota_abort(update_handle);
         printf("Calc: ");
-        for(int i=0; i<16; i++) printf("%02x", digest[i]);
+        for(int i=0; i<32; i++) printf("%02x", digest[i]);
         printf("\nExp : ");
-        for(int i=0; i<16; i++) printf("%02x", config.firmware_md5[i]);
+        for(int i=0; i<32; i++) printf("%02x", config.firmware_hash[i]);
         printf("\n");
-        FAIL("MD5 Mismatch");
+        FAIL("SHA-256 Mismatch");
     }
     
     if (config.cmd == ESPOTA_CMD_FLASH) {
-        // Validates image (checks magic byte 0xE9 and checksum)
         if (esp_ota_end(update_handle) != ESP_OK) {
             FAIL("OTA End/Validation failed");
         }
 
-        // Reset Meshtastic reboot counter
         INFO("Resetting Meshtastic reboot counter...");
         nvs_handle_t mesh_nvs;
         if (nvs_open("meshtastic", NVS_READWRITE, &mesh_nvs) == ESP_OK) {
@@ -208,7 +196,6 @@ void start_network_ota_process() {
             nvs_close(mesh_nvs);
         }
 
-        // Set boot partition to OTA_0 (part_target)
         if (esp_ota_set_boot_partition(part_target) != ESP_OK) {
             FAIL("Set boot partition failed");
         }
@@ -219,3 +206,4 @@ void start_network_ota_process() {
     
     closesocket(data_sock);
 }
+

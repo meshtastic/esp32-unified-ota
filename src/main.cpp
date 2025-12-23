@@ -44,3 +44,4 @@ extern "C" void app_main(void) {
         xTaskCreate(ble_ota_task, "ble_ota_task", 8192, NULL, 5, NULL);
     }
 }
+

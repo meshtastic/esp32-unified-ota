@@ -8,10 +8,10 @@ dependencies:
   idf:
     source:
       type: idf
-    version: 5.4.1
+    version: 5.5.0
 direct_dependencies:
 - h2zero/esp-nimble-cpp
 - idf
-manifest_hash: 0c0297b0fb4486bdb635c0b93386951c14486774208f741880dce4931d2c89cc
-target: esp32s3
+manifest_hash: 49bcf3f038ae2d564f27273c77b2ffbd40c30ac898ad00cd63f310a6890861a5
+target: esp32
 version: 2.0.0
