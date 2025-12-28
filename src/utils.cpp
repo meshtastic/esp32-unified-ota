@@ -16,3 +16,10 @@ void corrupt_partition(const esp_partition_t *partition) {
        INFO("Partition header corrupted successfully.");
    }
 }
+
+void print_hash(const char *prefix, const uint8_t *hash) {
+    printf(prefix);
+    for(int i=0; i<32; i++) printf("%02x", hash[i]);
+    printf("\r\n");
+}   
+    

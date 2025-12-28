@@ -31,7 +31,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
     }
 }
 
-void wifi_connect(const wifi_credentials_t *config) {
+void wifi_connect(const nvs_config_t *config) {
     event_group_handle = xEventGroupCreate();
     esp_netif_create_default_wifi_sta();
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();

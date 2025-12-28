@@ -5,6 +5,7 @@ idf_component_register(
         "wifi_app.cpp"
         "net_ota.cpp"
         "ble_ota.cpp"
+        "ota_processor.cpp"
         "utils.cpp"
     INCLUDE_DIRS "."
     REQUIRES 

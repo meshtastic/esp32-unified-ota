@@ -16,9 +16,10 @@ void nvs_init_custom(const char *nvs_namespace) {
     ESP_ERROR_CHECK(nvs_open(nvs_namespace, NVS_READWRITE, &s_nvs_handle));
 }
 
-void nvs_read_config(wifi_credentials_t *config) {
+void nvs_read_config(nvs_config_t *config) {
     size_t ssid_len = sizeof(config->ssid);
     size_t psk_len = sizeof(config->psk);
+    size_t hash_len = sizeof(config->ota_hash);
     config->method = 0; 
     memset(config->ssid, 0, 32);
     memset(config->psk, 0, 64);
@@ -26,7 +27,7 @@ void nvs_read_config(wifi_credentials_t *config) {
     if(nvs_get_u8(s_nvs_handle, "method", &config->method) != ESP_OK) INFO("No method found");
     nvs_get_str(s_nvs_handle, "ssid", config->ssid, &ssid_len);
     nvs_get_str(s_nvs_handle, "psk", config->psk, &psk_len);
-    
+    nvs_get_blob(s_nvs_handle, "ota_hash", config->ota_hash, &hash_len);
     nvs_set_u8(s_nvs_handle, "updated", 0);
     nvs_commit(s_nvs_handle);
 }

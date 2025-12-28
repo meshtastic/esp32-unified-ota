@@ -11,9 +11,12 @@
 #include "wifi_app.h"
 #include "net_ota.h"
 #include "ble_ota.h"
-
+#include "utils.h"
 #define TAG "MAIN"
 
+#define NO_REBOOT_OTA 0
+#define OTA_BLE 1
+#define OTA_WIFI 2
 
 extern "C" void app_main(void) {
 
@@ -23,16 +26,17 @@ extern "C" void app_main(void) {
     nvs_init_custom("MeshtasticOTA");
 
     INFO("\n\n//\\ E S H T /\\ S T / C\n\n");
-    INFO("OTA Loader\n\nBooting...");
+    printf("OTA Loader");
     
-    wifi_credentials_t config;
+    nvs_config_t config;
     nvs_read_config(&config);
 
-    if (config.method == 1) {
+    print_hash("Expecting firmware with hash: ", config.ota_hash);
+    if (config.method == OTA_WIFI) {
         INFO("Mode: WiFi OTA");
         INFO("Connecting to SSID: %s", config.ssid);
         wifi_connect(&config);
-        start_network_ota_process();
+        start_network_ota_process(&config);
         INFO("Marking NVRAM as updated.");
         nvs_mark_updated();
         INFO("Success. Rebooting.");

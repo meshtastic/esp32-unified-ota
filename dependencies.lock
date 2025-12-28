@@ -1,9 +1,27 @@
 dependencies:
-  esp-nimble-cpp:
-    dependencies: []
+  h2zero/esp-nimble-cpp:
+    component_hash: 53a8a861abde49ee21f687477709344fa4cee34cea38b475177648165fa9f859
+    dependencies:
+    - name: espressif/esp_hosted
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: target in [esp32p4]
+      version: '*'
+    - name: espressif/esp_wifi_remote
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: target in [esp32p4]
+      version: '>=0.5.3'
+    - name: idf
+      require: private
+      rules:
+      - if: target in [esp32p4]
+      version: '>=5.3.0'
     source:
-      path: /Users/jake/Meshtastic/firmware-ota-idf/components/esp-nimble-cpp
-      type: local
+      registry_url: https://components.espressif.com/
+      type: service
     version: 2.3.3
   idf:
     source:
@@ -12,6 +30,6 @@ dependencies:
 direct_dependencies:
 - h2zero/esp-nimble-cpp
 - idf
-manifest_hash: 49bcf3f038ae2d564f27273c77b2ffbd40c30ac898ad00cd63f310a6890861a5
-target: esp32
+manifest_hash: 38fafe4f8eab63f38b6035230ebdf9bee32bfda76793a85af227b310bd132282
+target: esp32s3
 version: 2.0.0
