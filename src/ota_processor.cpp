@@ -155,7 +155,15 @@ void OtaProcessor::handleOtaStart(const char* args) {
     const esp_partition_t *running = esp_ota_get_running_partition();
     esp_ota_set_boot_partition(running); 
 
+
+    // 1. Notify Client that we are about to block
+    sendResponse("ERASING"); 
+    // 2. Yield to FreeRTOS to ensure the "ERASING" packet 
+    // actually gets pushed to the BLE/TCP hardware buffer before we block the CPU.
+    vTaskDelay(50 / portTICK_PERIOD_MS); 
+
     INFO("Starting OTA. Size: %u, Part: 0x%lx", (unsigned int)_firmware_size, _target_partition->address);
+
 
     if (esp_ota_begin(_target_partition, _firmware_size, &_ota_handle) != ESP_OK) {
         sendResponse("ERR OTA Begin Failed\n");
