@@ -49,6 +49,9 @@ void start_network_ota_process(const nvs_config_t *config) {
     OtaProcessor otaProcessor;
     uint8_t rx_buffer[1024];
 
+    // Set the expencted hash from the NVS
+    otaProcessor.setNvramExpectedHash(config->ota_hash);
+
     while (true) {
         int client_sock = -1;
         struct sockaddr_in client_addr;

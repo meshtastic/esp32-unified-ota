@@ -28,7 +28,11 @@ void OtaProcessor::setSender(ota_sender_t sender) {
     _sender = sender;
 }
 
-// NEW: Setter for ACK mode
+void OtaProcessor::setNvramExpectedHash(const uint8_t* hash) {
+    memcpy(_nvs_expected_hash, hash, 32);
+    _has_nvs_hash = true;
+}
+
 void OtaProcessor::setAckEnabled(bool enabled) {
     _ack_enabled = enabled;
 }
@@ -144,6 +148,19 @@ void OtaProcessor::handleOtaStart(const char* args) {
         return;
     }
 
+    if (_has_nvs_hash) {
+        if (memcmp(_expected_hash, _nvs_expected_hash, 32) != 0) {
+            INFO("Security Alert: Client provided hash does not match NVS hash!");
+            print_hash("Client: ", _expected_hash);
+            print_hash("NVS   : ", _nvs_expected_hash);
+            sendResponse("ERR Hash Rejected (NVS Mismatch)\n");
+            return;
+        }
+    } else {
+        sendResponse("ERR No Hash (NVS hash missing)\n");
+        return;
+    }
+
     _firmware_size = size;
     _target_partition = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, NULL);
     
@@ -220,12 +237,14 @@ void OtaProcessor::endOta() {
     uint8_t calculated_hash[32];
     mbedtls_sha256_finish(&_sha_ctx, calculated_hash);
     
+    // Compare Calculated vs Expected (which we verified matches NVS in handleOtaStart)
     if (memcmp(calculated_hash, _expected_hash, 32) != 0) {
+        corrupt_partition(_target_partition);
         INFO("Hash Mismatch");
         print_hash("Calc: ", calculated_hash);
         print_hash("Exp : ", _expected_hash);
         sendResponse("ERR Hash Mismatch\n");
-        esp_ota_abort(_ota_handle);
+        // Do not use esp_ota_abort becasue we're not doing the flip/flop partition thing.
         _ota_handle = 0; 
         reset();
         return;

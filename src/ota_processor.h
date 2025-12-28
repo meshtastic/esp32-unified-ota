@@ -15,6 +15,8 @@ public:
     ~OtaProcessor();
 
     void setSender(ota_sender_t sender);
+    void setNvramExpectedHash(const uint8_t* hash);
+
     void process(const uint8_t* data, size_t len);
     void reset();
     bool isRebootRequired() const;
@@ -31,8 +33,11 @@ private:
     State _state;
     ota_sender_t _sender;
     bool _reboot_required;
-    bool _ack_enabled; // New flag
+    bool _ack_enabled;
     
+    uint8_t _nvs_expected_hash[32];
+    bool _has_nvs_hash;
+
     esp_ota_handle_t _ota_handle;
     const esp_partition_t* _target_partition;
     size_t _firmware_size;

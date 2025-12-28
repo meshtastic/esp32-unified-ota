@@ -40,6 +40,11 @@ class MyServerCallbacks : public BLEServerCallbacks {
         
         deviceConnected = true;
         
+        nvs_config_t config;
+        nvs_read_config(&config);
+        // Set the hash in the static otaProcessor instance
+        otaProcessor.setNvramExpectedHash(config.ota_hash);
+
         // Reset Processor and Buffer
         otaProcessor.reset();
         otaProcessor.setAckEnabled(true);
