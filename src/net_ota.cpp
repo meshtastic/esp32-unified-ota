@@ -28,7 +28,7 @@ void start_network_ota_process(const nvs_config_t *config) {
 
     char discovery_msg[32];
     char* devName = getDeviceName();
-    snprintf(discovery_msg, sizeof(discovery_msg), "%s", devName);
+    snprintf(discovery_msg, sizeof(discovery_msg), "%s %s", devName, GIT_VERSION);
 
     int listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
     if (listen_sock < 0) FAIL("Failed to create TCP socket");

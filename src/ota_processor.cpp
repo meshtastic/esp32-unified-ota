@@ -109,8 +109,10 @@ void OtaProcessor::handleVersion() {
     uint32_t reboot_counter = 0;
     uint8_t hw_vendor = 0;
     char fw_rev[32] = {0};
-    nvs_get_meshtastic_info(&reboot_counter, &hw_vendor, fw_rev, sizeof(fw_rev));
-    sendResponse("OK %d %s %lu\n", hw_vendor, fw_rev, (unsigned long)reboot_counter);
+    size_t fw_rev_len = sizeof(fw_rev);
+    nvs_get_meshtastic_info(&reboot_counter, &hw_vendor, fw_rev, fw_rev_len);
+    // Append version + git hash
+    sendResponse("OK %d %s %lu v%s\n", hw_vendor, fw_rev, (unsigned long)reboot_counter, GIT_VERSION);
 }
 
 void OtaProcessor::handleReboot() {

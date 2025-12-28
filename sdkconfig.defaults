@@ -1,54 +1,86 @@
 # ---------------------------------------------------------------
-# Compiler & Linker Optimization
+# Espressif IDF sdkconfig.defaults for Meshtastic ESP32 Unified OTA
+# ===============================================================
+# Goal: Minimize binary to <655360 bytes (OTA_1 partition limit)
+# Current optimizations:
+# - -Os + LTO + no asserts/paths/exceptions/RTTI
+# - Logging OFF
+# - NimBLE minimal (1 conn, BLE peripheral/broadcaster only)
+# - LWIP IPv4-only, tiny buffers/sockets
+# - mbedTLS minimal (SHA256/AES only, no TLS/EC/HTTPS)
+# - No FS/ETH/GDB/Unity/HTTPD/SoftAP/WPA3/Mesh
+# - Tiny FreeRTOS stacks/queues
+# - Test incrementally with `pio run --target size`
+# ---------------------------------------------------------------
+
+# ---------------------------------------------------------------
+# 1. Compiler & Linker Optimization (Aggressive Size)
 # ---------------------------------------------------------------
 # Optimize for size (-Os)
 CONFIG_COMPILER_OPTIMIZATION_SIZE=y
 CONFIG_COMPILER_OPTIMIZATION_DEFAULT=n
 CONFIG_COMPILER_OPTIMIZATION_PERF=n
 
-# Disable assertions (removes file paths and condition strings)
+# Disable assertions (removes file paths/conditions)
 CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_DISABLE=y
 CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_ENABLE=n
 CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=n
 
-# Remove headers and file paths from binary
+# Hide paths/headers from binary
 CONFIG_COMPILER_HIDE_PATHS_MACROS=y
 
+# Disable C++ extras (no throw/RTTI)
+CONFIG_COMPILER_CXX_EXCEPTIONS=n
+CONFIG_COMPILER_CXX_RTTI=n
+
+# Disable stack smashing (saves space)
+CONFIG_COMPILER_STACK_CHECK_MODE_NONE=y
+
+# LTO + linker tweaks
+CONFIG_COMPILER_LTO=y
+CONFIG_COMPILER_ORPHAN_SECTIONS_PLACE=y  # Better dead-code elim
+CONFIG_APP_RETRIEVE_LEN_ELF_SHA=0         # No ELF SHA
+
 # ---------------------------------------------------------------
-# Logging (Silence everything for max space savings)
+# 2. Logging (Fully Disabled)
 # ---------------------------------------------------------------
 CONFIG_LOG_DEFAULT_LEVEL_NONE=y
 CONFIG_LOG_DEFAULT_LEVEL=0
 CONFIG_LOG_MAXIMUM_LEVEL=0
 CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
+CONFIG_LOG_IN_IRAM=n
 
 # ---------------------------------------------------------------
-# Bluetooth / NimBLE Optimization
+# 3. Bluetooth / NimBLE (Minimal Peripheral OTA Server)
 # ---------------------------------------------------------------
 CONFIG_BT_ENABLED=y
-#CONFIG_BT_NIMBLE_ENABLED=y
-CONFIG_BT_NIMBLE_NVS_PERSIST=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_CONTROLLER_ENABLED=y
 CONFIG_BT_CONTROLLER_DISABLED=n
 CONFIG_BT_BLUEDROID_ENABLED=n
 
-# Disable unused roles (You are a Server, so you don't need Central/Scan)
+# Roles: Peripheral + Broadcaster only (no Central/Observer)
 CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
 CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
 CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
 CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
 
-# Reduce Max Connections/Bonds to minimum required (1 connection is enough for OTA)
+# Minimal connections/bonds/memory
 CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
 CONFIG_BT_NIMBLE_MAX_BONDS=1
-CONFIG_BT_NIMBLE_MAX_CCCDS=4
+CONFIG_BT_NIMBLE_MAX_CCCDS=2            # Reduced from 4
 CONFIG_BTDM_CTRL_BLE_MAX_CONN=1
 CONFIG_BTDM_CTRL_BLE_MAX_CONN_EFF=1
+CONFIG_BT_NIMBLE_GATT_MAX_PROCS=2       # Reduced from 4
+CONFIG_BT_NIMBLE_WHITELIST_SIZE=4       # Reduced from 12
 
-# Disable NimBLE Logging
+# No logging/services/persist if possible (keep NVS for bonds)
 CONFIG_BT_NIMBLE_LOG_LEVEL_NONE=y
+CONFIG_BT_NIMBLE_NVS_PERSIST=y
 CONFIG_NIMBLE_CPP_LOG_LEVEL_NONE=y
+CONFIG_BT_NIMBLE_PRINT_ERR_NAME=n
 
-# Memory tuning
+# Tiny memory pools
 CONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=12
 CONFIG_BT_NIMBLE_ACL_BUF_COUNT=12
 CONFIG_BT_NIMBLE_ACL_BUF_SIZE=255
@@ -56,6 +88,7 @@ CONFIG_BT_NIMBLE_HCI_EVT_BUF_SIZE=70
 CONFIG_BT_NIMBLE_HCI_EVT_HI_BUF_COUNT=30
 CONFIG_BT_NIMBLE_HCI_EVT_LO_BUF_COUNT=8
 
+# Disable all unused BLE services
 CONFIG_BT_NIMBLE_PROX_SERVICE=n
 CONFIG_BT_NIMBLE_ANS_SERVICE=n
 CONFIG_BT_NIMBLE_CTS_SERVICE=n
@@ -68,177 +101,116 @@ CONFIG_BT_NIMBLE_SPS_SERVICE=n
 CONFIG_BT_NIMBLE_HR_SERVICE=n
 CONFIG_BT_NIMBLE_BAS_SERVICE=n
 CONFIG_BT_NIMBLE_DIS_SERVICE=n
+CONFIG_BT_NIMBLE_HID_SERVICE=n
+
+# Crypto/Extras: TinyCrypt backend, no SC
+CONFIG_BT_NIMBLE_CRYPTO_STACK_MBEDTLS=n
+CONFIG_BT_NIMBLE_SM_SC=n
+CONFIG_BT_NIMBLE_HS_FLOW_CTRL=n         # Client flow-controls
 
 # ---------------------------------------------------------------
-# Networking (LwIP / MbedTLS)
+# 4. Networking (LwIP - IPv4 Tiny STA Only)
 # ---------------------------------------------------------------
-# Disable IPv6 (Saves ~40-60KB if you only use IPv4)
-CONFIG_LWIP_IPV6=n
+CONFIG_LWIP_IPV6=n                      # IPv4-only (~40KB saved)
 
-# Reduce TCP Buffer sizes
+# Tiny TCP/UDP/Sockets (1 TCP conn + UDP broadcast)
+CONFIG_LWIP_MAX_SOCKETS=5
+CONFIG_LWIP_MAX_UDP_PCBS=8
+CONFIG_LWIP_MAX_RAW_PCBS=1
+CONFIG_LWIP_MAX_ACTIVE_TCP=8
+CONFIG_LWIP_MAX_LISTENING_TCP=5
+CONFIG_LWIP_TCPIP_RECVMBOX_SIZE=16
+CONFIG_LWIP_TCP_RECVMBOX_SIZE=4
+CONFIG_LWIP_TCP_ACCEPTMBOX_SIZE=4
+CONFIG_LWIP_UDP_RECVMBOX_SIZE=4
+
+# Tiny buffers
 CONFIG_LWIP_TCP_MSS=536
 CONFIG_LWIP_TCP_WND_DEFAULT=2144
 CONFIG_LWIP_TCP_SND_BUF_DEFAULT=2144
 
-# MbedTLS Optimization
-# Disable Certificate Bundle (You are likely not validating external root CAs for local OTA)
-CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=n
-# Disable unnecessary hardware acceleration wrappers if not used heavily
-CONFIG_MBEDTLS_HARDWARE_MPI=n
+# No DHCP server/forwarding/stats
+CONFIG_LWIP_DHCPS=n
+CONFIG_LWIP_IP_FORWARD=n
+CONFIG_LWIP_STATS=n
 
 # ---------------------------------------------------------------
-# System / FreeRTOS
+# 5. mbedTLS / Crypto (SHA256/AES Only - No TLS/HTTPS/EC)
 # ---------------------------------------------------------------
-# Use Nano formatting for printf (smaller, no float support by default)
-CONFIG_NEWLIB_NANO_FORMAT=y
-
-# Panic handler: Print minimal info and reboot (saves decoding logic)
-CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y
-CONFIG_ESP_SYSTEM_PANIC_GDBSTUB=n
-
-# Disable Stack Smashing Protection (Saves space, slightly less secure)
-CONFIG_COMPILER_STACK_CHECK_MODE_NONE=y
-
-# ---------------------------------------------------------------
-# Project Specifics
-# ---------------------------------------------------------------
-# Disable WPA3 (SAE) - Saves significant space if using WPA2
-CONFIG_ESP_WIFI_ENABLE_WPA3_SAE=n
-CONFIG_ESP_WIFI_ENABLE_WPA3_OWE_STA=n
-CONFIG_ESP_WIFI_ENABLE_SAE_PK=n
-
-# Disable WPA Enterprise (802.1x) - You are using PSK
-CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n
-
-# Disable WiFi Mesh
-CONFIG_ESP_WIFI_MESH_SUPPORT=n
-
-# Disable SoftAP support (Your code only uses Station mode)
-CONFIG_ESP_WIFI_SOFTAP_SUPPORT=n
-
-# Disable C++ Exceptions (Your code uses std::string but will abort on error instead of throw)
-CONFIG_COMPILER_CXX_EXCEPTIONS=n
-
-# Disable RTTI (Run Time Type Info)
-CONFIG_COMPILER_CXX_RTTI=n
-
-# Disable Ethernet Drivers
-CONFIG_ETH_ENABLED=n
-
-# Store PHY calibration data in NVS only (saves code space for init data)
-CONFIG_ESP_PHY_INIT_DATA_IN_PARTITION=n
-CONFIG_ESP_PHY_CALIBRATION_AND_DATA_STORAGE=y
-
-CONFIG_MQTT_PROTOCOL_311=n
-CONFIG_MQTT_TRANSPORT_SSL=n
-
-# =================================================
-# CRYPTO / MBEDTLS (MINIMAL TO PASS BUILD)
-# =================================================
-# We must enable TLS to satisfy internal dependency checks
-CONFIG_MBEDTLS_TLS_ENABLED=y
-CONFIG_MBEDTLS_TLS_CLIENT=y
-CONFIG_MBEDTLS_TLS_SERVER=n
-
-# Enable ONLY TLS 1.2 to satisfy mbedtls/check_config.h
-CONFIG_MBEDTLS_SSL_PROTO_TLS1_2=y
-CONFIG_MBEDTLS_SSL_PROTO_TLS1_3=n
-CONFIG_MBEDTLS_SSL_PROTO_DTLS=n
-CONFIG_MBEDTLS_SSL_ALPN=n
-CONFIG_MBEDTLS_SSL_SESSION_TICKETS=n
-CONFIG_MBEDTLS_SSL_RENEGOTIATION=n
-CONFIG_MBEDTLS_SSL_TLS_C=n
-CONFIG_MBEDTLS_SSL_CLI_C=n
-CONFIG_MBEDTLS_SSL_SRV_C=n
-CONFIG_MBEDTLS_SSL_CACHE_C=n
-
-# Enable ONLY RSA to satisfy "no key exchange methods" error
-CONFIG_MBEDTLS_KEY_EXCHANGE_RSA=y
-CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_RSA=n
-CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA=n
-CONFIG_MBEDTLS_KEY_EXCHANGE_ECDH_ECDSA=n
-CONFIG_MBEDTLS_KEY_EXCHANGE_ECDH_RSA=n
-CONFIG_MBEDTLS_KEY_EXCHANGE_DHE_RSA=n
-CONFIG_MBEDTLS_PKCS7_C=n
-
-# Keep raw crypto needed for WPA2 / OTA Checksums
+# Minimal: Keep for WiFi/OTA hash (linker strips unused TLS)
+CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC=y
+CONFIG_MBEDTLS_HARDWARE_AES=y
+CONFIG_MBEDTLS_HARDWARE_SHA=y
 CONFIG_MBEDTLS_AES_C=y
 CONFIG_MBEDTLS_SHA256_C=y
-CONFIG_MBEDTLS_MD5_C=n
 CONFIG_MBEDTLS_CMAC_C=y
+CONFIG_MBEDTLS_ROM_MD5=y
+CONFIG_MBEDTLS_HARDWARE_MPI=n
 
-CONFIG_MBEDTLS_PEM_PARSE_C=n
-CONFIG_MBEDTLS_PEM_WRITE_C=n
-CONFIG_MBEDTLS_X509_CRL_PARSE_C=n
-CONFIG_MBEDTLS_X509_CSR_PARSE_C=n
-CONFIG_MBEDTLS_X509_CRT_PARSE_C=n
-CONFIG_MBEDTLS_PK_PARSE_EC_EXTENDED=n
-CONFIG_MBEDTLS_ECP_C=n
-CONFIG_MBEDTLS_ECDH_C=n
-CONFIG_MBEDTLS_ECDSA_C=n
-CONFIG_MBEDTLS_SHA512_C=n
-CONFIG_MBEDTLS_CCM_C=n
-CONFIG_MBEDTLS_GCM_C=n
-
-# =================================================
-# DISABLE HTTPS (CRITICAL FOR SIZE)
-# =================================================
-# Disabling these ensures the TLS code enabled above is never 
-# referenced, allowing the Linker to strip it out.
-CONFIG_ESP_HTTPS_SERVER_ENABLE=n
-CONFIG_ESP_HTTP_CLIENT_ENABLE_HTTPS=n
-CONFIG_ESP_HTTP_CLIENT_ENABLE_BASIC_AUTH=n
-CONFIG_ESP_HTTP_CLIENT_ENABLE_DIGEST_AUTH=n
-CONFIG_WS_TRANSPORT=n
-
-
-# =================================================
-# Turn off the GDB stub
-# =================================================
-CONFIG_ESP_GDBSTUB_ENABLED=n
-CONFIG_ESP_GDBSTUB_SUPPORT_TASKS=n
-CONFIG_BT_NIMBLE_PRINT_ERR_NAME=n
-CONFIG_MBEDTLS_ERROR_STRINGS=n
-CONFIG_ESP_ERR_TO_NAME_LOOKUP=n
-
-CONFIG_VFS_SEMIHOSTFS_MAX_MOUNT_POINTS=0
-CONFIG_VFS_INITIALIZE_DEV_NULL=n
-
-CONFIG_ESP_ROM_PRINT_IN_IRAM=n
-CONFIG_ESP_SYSTEM_IN_IRAM=n
-CONFIG_LOG_IN_IRAM=n
-CONFIG_LIBC_MISC_IN_IRAM=n
-CONFIG_LIBC_LOCKS_PLACE_IN_IRAM=n
-CONFIG_ESP_TIMER_IN_IRAM=n
-
-CONFIG_COMPILER_LTO=y
-CONFIG_BT_NIMBLE_SM_SC=n
-CONFIG_BT_NIMBLE_CRYPTO_STACK_MBEDTLS=n  # use TinyCrypt back end
-
-CONFIG_MBEDTLS_TLS_DISABLED=y
+# Disable all TLS/EC/X509/HTTPS (dead code stripped)
+CONFIG_MBEDTLS_TLS_ENABLED=n
+CONFIG_MBEDTLS_TLS_CLIENT=n
+CONFIG_MBEDTLS_TLS_SERVER=n
+CONFIG_MBEDTLS_SSL_PROTO_TLS1_2=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_RSA=n
 CONFIG_MBEDTLS_KEY_EXCHANGE_ELLIPTIC_CURVE=n
 CONFIG_MBEDTLS_ECP_C=n
 CONFIG_MBEDTLS_ECDH_C=n
 CONFIG_MBEDTLS_ECDSA_C=n
 CONFIG_MBEDTLS_PK_PARSE_EC_COMPRESSED=n
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=n
+CONFIG_MBEDTLS_ERROR_STRINGS=n
+CONFIG_ESP_HTTP_CLIENT_ENABLE_HTTPS=n
+CONFIG_ESP_HTTPS_SERVER_ENABLE=n
+CONFIG_ESP_HTTPS_OTA_ALLOW_HTTP=n
+CONFIG_WS_TRANSPORT=n
 
-# CONFIG_MBEDTLS_TLS_SERVER=n
-CONFIG_MBEDTLS_TLS_CLIENT=n
-CONFIG_MBEDTLS_TLS_ENABLED=n
+# ---------------------------------------------------------------
+# 6. System / FreeRTOS (Minimal Kernel)
+# ---------------------------------------------------------------
+# Nano newlib (no float printf)
+CONFIG_NEWLIB_NANO_FORMAT=y
 
-CONFIG_FATFS_VOLUME_COUNT=0
-CONFIG_SPIFFS_MAX_PARTITIONS=0
-CONFIG_WL_SECTOR_SIZE_4096=n
-CONFIG_UNITY_ENABLE_IDF_TEST_RUNNER=n
+# Panic: Reboot only (no GDB/decode)
+CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y
+CONFIG_ESP_SYSTEM_PANIC_GDBSTUB=n
 
-
-# === KERNEL / FreeRTOS Reductions (~100 bytes) ===
+# Tiny stacks/queues (safe for OTA tasks)
 CONFIG_FREERTOS_IDLE_TASK_STACKSIZE=1024
 CONFIG_FREERTOS_ISR_STACKSIZE=1024
 CONFIG_FREERTOS_TIMER_TASK_STACK_DEPTH=1024
-CONFIG_FREERTOS_MINIMAL_SHARED_STACK_SIZE=1024  ; Already 2048, halve it
+CONFIG_FREERTOS_MINIMAL_SHARED_STACK_SIZE=1024
+CONFIG_FREERTOS_TIMER_QUEUE_LENGTH=5
 
-# === Disable Unused Subsystems (~200-300 bytes) ===
+# No IRAM bloat
+CONFIG_ESP_ROM_PRINT_IN_IRAM=n
+CONFIG_ESP_SYSTEM_IN_IRAM=n
+CONFIG_LIBC_MISC_IN_IRAM=n
+CONFIG_LIBC_LOCKS_PLACE_IN_IRAM=n
+CONFIG_ESP_TIMER_IN_IRAM=n
+
+# ---------------------------------------------------------------
+# 7. WiFi / Project Specifics (STA-Only, WPA2)
+# ---------------------------------------------------------------
+# STA-only, no SoftAP/Mesh/WPA3/Enterprise
+CONFIG_ESP_WIFI_SOFTAP_SUPPORT=n
+CONFIG_ESP_WIFI_MESH_SUPPORT=n
+CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n
+CONFIG_ESP_WIFI_ENABLE_WPA3_SAE=n
+CONFIG_ESP_WIFI_ENABLE_WPA3_OWE_STA=n
+CONFIG_ESP_WIFI_ENABLE_SAE_PK=n
+
+# PHY: NVS-only calibration
+CONFIG_ESP_PHY_INIT_DATA_IN_PARTITION=n
+CONFIG_ESP_PHY_CALIBRATION_AND_DATA_STORAGE=y
+
+# Partition tweaks
+CONFIG_PARTITION_TABLE_MD5=n
+
+# ---------------------------------------------------------------
+# 8. Component Disables (Dead Code Elimination)
+# ---------------------------------------------------------------
+# No ETH/GDB/FS/Unity/HTTPD/VFS extras
 CONFIG_ETH_ENABLED=n
 CONFIG_ESP_GDBSTUB_ENABLED=n
 CONFIG_FATFS_VOLUME_COUNT=0
@@ -246,30 +218,18 @@ CONFIG_SPIFFS_MAX_PARTITIONS=0
 CONFIG_UNITY_ENABLE_IDF_TEST_RUNNER=n
 CONFIG_UNITY_ENABLE_FLOAT=n
 CONFIG_UNITY_ENABLE_DOUBLE=n
-
-# === HTTPD Disable (raw sockets only, ~50-100 bytes) ===
 CONFIG_HTTPD_MAX_REQ_HDR_LEN=0
 CONFIG_HTTPD_MAX_URI_LEN=0
 CONFIG_HTTPD_PURGE_BUF_LEN=0
+CONFIG_VFS_SEMIHOSTFS_MAX_MOUNT_POINTS=0
+CONFIG_VFS_INITIALIZE_DEV_NULL=n
+CONFIG_MQTT_PROTOCOL_311=n
+CONFIG_MQTT_TRANSPORT_SSL=n
 
-# === LWIP Further Trims (~50 bytes) ===
-CONFIG_LWIP_MAX_SOCKETS=5
-CONFIG_LWIP_MAX_UDP_PCBS=8
-CONFIG_LWIP_MAX_RAW_PCBS=1
-CONFIG_LWIP_DHCPS=n  ; No DHCP server needed
-CONFIG_LWIP_MAX_LISTENING_TCP=5
-CONFIG_LWIP_TCPIP_RECVMBOX_SIZE=16
-CONFIG_LWIP_TCP_RECVMBOX_SIZE=4
-CONFIG_LWIP_TCP_ACCEPTMBOX_SIZE=4
-CONFIG_LWIP_UDP_RECVMBOX_SIZE=4
-
-# === NimBLE Further Min (~50 bytes) ===
-CONFIG_BT_NIMBLE_MAX_CCCDS=2  ; Down from 4
-CONFIG_BT_NIMBLE_HS_FLOW_CTRL=n  ; Disable flow ctrl if BLE client handles it
-CONFIG_BT_NIMBLE_WHITELIST_SIZE=4  ; Down from 12
-CONFIG_BT_NIMBLE_GATT_MAX_PROCS=2  ; Down from 4
-
-# === Misc Trims ===
-CONFIG_COMPILER_ORPHAN_SECTIONS_PLACE=y  ; Linker optimization
-CONFIG_PARTITION_TABLE_MD5=n  ; Disable MD5 checksums on PT
-CONFIG_APP_RETRIEVE_LEN_ELF_SHA=0  ; Disable ELF SHA
+# ---------------------------------------------------------------
+# 9. Build / Bootloader Trims
+# ---------------------------------------------------------------
+CONFIG_APP_BUILD_GENERATE_BINARIES=y
+CONFIG_APP_BUILD_BOOTLOADER=y
+CONFIG_BOOTLOADER_COMPILER_OPTIMIZATION_SIZE=y
+CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y

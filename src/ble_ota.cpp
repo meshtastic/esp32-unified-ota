@@ -9,6 +9,7 @@
 #include "esp_task_wdt.h"
 #include "NimBLEDevice.h"
 #include <string>
+#include "utils.h"
 
 #define TAG "BLE_OTA"
 #define SERVICE_UUID "4FAFC201-1FB5-459E-8FCC-C5C9C331914B"
@@ -26,14 +27,6 @@ static bool deviceConnected = false;
 static bool oldDeviceConnected = false;
 static OtaProcessor otaProcessor;
 static StreamBufferHandle_t xStreamBuffer = NULL;
-
-static char *getDeviceName() {
-    static char name[20];
-    uint8_t mac[6];
-    esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    snprintf(name, sizeof(name), "Meshtastic_%02X%02X", mac[4], mac[5]);
-    return name;
-}
 
 class MyServerCallbacks : public BLEServerCallbacks {
     void onConnect(BLEServer *pServer, NimBLEConnInfo& connInfo) override {
