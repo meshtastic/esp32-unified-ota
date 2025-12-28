@@ -1,6 +1,7 @@
 #include "common_log.h"
 #include "esp_ota_ops.h"
 #include "esp_partition.h"
+#include "esp_mac.h"
 #include <cstring>
 #include <cstdio>
 
@@ -23,3 +24,10 @@ void print_hash(const char *prefix, const uint8_t *hash) {
     printf("\r\n");
 }   
     
+char *getDeviceName() {
+    static char name[20];
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    snprintf(name, sizeof(name), "Meshtastic_%02X%02X", mac[4], mac[5]);
+    return name;
+}

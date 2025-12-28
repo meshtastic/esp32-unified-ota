@@ -31,5 +31,5 @@ direct_dependencies:
 - h2zero/esp-nimble-cpp
 - idf
 manifest_hash: 38fafe4f8eab63f38b6035230ebdf9bee32bfda76793a85af227b310bd132282
-target: esp32s3
+target: esp32
 version: 2.0.0

@@ -27,12 +27,12 @@ static bool oldDeviceConnected = false;
 static OtaProcessor otaProcessor;
 static StreamBufferHandle_t xStreamBuffer = NULL;
 
-static std::string getDeviceName() {
+static char *getDeviceName() {
+    static char name[20];
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    char name[20];
-    snprintf(name, sizeof(name), "Meshtastic_%02x%02x", mac[4], mac[5]);
-    return std::string(name);
+    snprintf(name, sizeof(name), "Meshtastic_%02X%02X", mac[4], mac[5]);
+    return name;
 }
 
 class MyServerCallbacks : public BLEServerCallbacks {
@@ -100,10 +100,9 @@ void ble_ota_task(void *param) {
     size_t fwrev_len = sizeof(fwrev);
     nvs_get_meshtastic_info(&rebootCounter, &hwven, fwrev, fwrev_len);
     INFO("BLE Init - FW: %s", fwrev);
-
-    std::string manData = std::to_string(hwven) + "|" + std::string(fwrev);
     
-    NimBLEDevice::init(getDeviceName());
+    const char *devName = getDeviceName();
+    NimBLEDevice::init(std::string{devName});
     NimBLEDevice::setMTU(517); 
     NimBLEDevice::setPower(ESP_PWR_LVL_P9); 
     
@@ -119,7 +118,6 @@ void ble_ota_task(void *param) {
     
     NimBLEAdvertising *pAdvertising = pServer->getAdvertising();
     pAdvertising->addServiceUUID(pService->getUUID());
-    pAdvertising->setManufacturerData(manData);
     pAdvertising->start();
     
     INFO("BLE Advertising started.");
