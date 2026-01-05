@@ -14,7 +14,8 @@
 
 #define RESP_OK "OK\n"
 #define RESP_ERR "ERR\n"
-#define RESP_ACK "ACK" // No newline needed for BLE packets usually, but keeps it simple
+#define RESP_ERASING "ERASING\n"
+#define RESP_ACK "ACK\n" // No newline needed for BLE packets usually, but keeps it simple
 
 OtaProcessor::OtaProcessor() : _state(STATE_IDLE), _sender(nullptr), _reboot_required(false), _ack_enabled(false) {
     reset();
@@ -174,7 +175,7 @@ void OtaProcessor::handleOtaStart(const char* args) {
 
 
     // 1. Notify Client that we are about to block
-    sendResponse("ERASING"); 
+    sendResponse(RESP_ERASING); 
     // 2. Yield to FreeRTOS to ensure the "ERASING" packet 
     // actually gets pushed to the BLE/TCP hardware buffer before we block the CPU.
     vTaskDelay(50 / portTICK_PERIOD_MS); 
