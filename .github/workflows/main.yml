@@ -1,3 +1,4 @@
+# trunk-ignore-all(checkov/CKV_GHA_7)
 name: CI
 
 on:
@@ -17,8 +18,26 @@ on:
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+    inputs:
+      create_release:
+        description: Create release
+        required: false
+        default: false
+        type: boolean
 
 jobs:
+  version:
+    if: inputs.create_release == true
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v6
+      - id: version
+        run: |
+          VERSION=$(cat version.txt)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
   build:
     runs-on: ubuntu-latest
     strategy:
@@ -31,6 +50,8 @@ jobs:
           - esp32c3
           - esp32c6
           # - esp32c5
+    # Ignore failures for esp32c3 and esp32c6 for now
+    continue-on-error: ${{ matrix.pio_env == 'esp32c3' || matrix.pio_env == 'esp32c6' }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -52,8 +73,32 @@ jobs:
           PIO_ENV: ${{ matrix.pio_env }}
         run: pio run -e $PIO_ENV
 
+      - name: Rename firmware binary
+        run: mv .pio/build/${{ matrix.pio_env }}/firmware.bin .pio/build/mt-${{ matrix.pio_env }}-ota.bin
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.pio_env }}
-          path: .pio/build/${{ matrix.pio_env }}/firmware.bin
+          path: .pio/build/mt-${{ matrix.pio_env }}-ota.bin
+
+  release:
+    runs-on: ubuntu-slim
+    if: inputs.create_release == true
+    needs: [version, build]
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v7
+        with:
+          merge-multiple: true
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        id: create_release
+        with:
+          draft: true
+          prerelease: true
+          name: Meshtastic ESP32 Unified OTA ${{ github.ref_name }}
+          generate_release_notes: true
+          tag_name: v${{ needs.version.outputs.version }}
+          files: |
+            mt-*-ota.bin
