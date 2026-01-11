@@ -4,6 +4,7 @@
 #include "esp_netif.h"
 #include "esp_event.h"
 #include "esp_system.h"
+#include "esp_app_desc.h"
 
 // Project Includes
 #include "common_log.h"
@@ -24,9 +25,11 @@ extern "C" void app_main(void) {
     esp_event_loop_create_default();
 
     nvs_init_custom("MeshtasticOTA");
-
+    
+    const esp_app_desc_t *app_desc = esp_app_get_description();
     INFO("\n\n//\\ E S H T /\\ S T / C\n\n");
-    printf("OTA Loader");
+    printf("OTA Loader v%s\r\n", app_desc->version); // <--- Access version string here
+    printf("Compiled on: %s %s\r\n", app_desc->date, app_desc->time);
     
     nvs_config_t config;
     nvs_read_config(&config);

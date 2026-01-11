@@ -9,6 +9,7 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdarg>
+#include "esp_app_desc.h"
 
 #define TAG "OTA_PROC"
 
@@ -116,8 +117,11 @@ void OtaProcessor::handleVersion() {
     char fw_rev[32] = {0};
     size_t fw_rev_len = sizeof(fw_rev);
     nvs_get_meshtastic_info(&reboot_counter, &hw_vendor, fw_rev, fw_rev_len);
+
+    const esp_app_desc_t *app_desc = esp_app_get_description();
+    
     // Append version + git hash
-    sendResponse("OK %d %s %lu v%s\n", hw_vendor, fw_rev, (unsigned long)reboot_counter, GIT_VERSION);
+    sendResponse("OK %d %s %lu v%s\n", hw_vendor, fw_rev, (unsigned long)reboot_counter, app_desc->version);
 }
 
 void OtaProcessor::handleReboot() {
