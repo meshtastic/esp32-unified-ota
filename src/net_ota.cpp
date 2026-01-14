@@ -26,9 +26,10 @@ void start_network_ota_process(const nvs_config_t *config) {
     broadcast_addr.sin_port = htons(OTA_PORT);
     broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 
-    char discovery_msg[32];
+    char discovery_msg[64];
     char* devName = getDeviceName();
-    snprintf(discovery_msg, sizeof(discovery_msg), "%s %s", devName, GIT_VERSION);
+    const esp_app_desc_t *app_desc = esp_app_get_description();
+    snprintf(discovery_msg, sizeof(discovery_msg), "%s %s", devName, app_desc->version);
 
     int listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
     if (listen_sock < 0) FAIL("Failed to create TCP socket");
