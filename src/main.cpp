@@ -5,6 +5,7 @@
 #include "esp_event.h"
 #include "esp_system.h"
 #include "esp_app_desc.h"
+#include "esp_ota_ops.h"
 
 // Project Includes
 #include "common_log.h"
@@ -40,7 +41,16 @@ extern "C" void app_main(void) {
     nvs_config_t config;
     nvs_read_config(&config);
 
-    print_hash("Expecting firmware with hash: ", config.ota_hash);
+    print_hash("Expecting firmware with hash: \r\n\t", config.ota_hash);
+
+    const esp_partition_t* main_firmware_partition = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, NULL);
+    if (main_firmware_partition != NULL) {
+        if (esp_ota_set_boot_partition(main_firmware_partition) == ESP_OK) {
+            INFO("Rebooting will go back to main firmware.");
+        } else {
+            INFO("Boot partition is locked to OTA loader.");
+        }
+    }
 
     // If BLE is disabled at compile time, force WiFi mode or check for configuration errors
     #ifndef USE_BLE_OTA
@@ -57,8 +67,6 @@ extern "C" void app_main(void) {
         INFO("Connecting to SSID: %s", config.ssid);
         wifi_connect(&config);
         start_network_ota_process(&config);
-        INFO("Marking NVRAM as updated.");
-        nvs_mark_updated();
         INFO("Success. Rebooting.");
         esp_restart();
         #else

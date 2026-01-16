@@ -4,3 +4,5 @@ src/build/*
 .pio/
 managed_components/
 .vscode/
+sdkconfig.esp*
+dependencies.lock

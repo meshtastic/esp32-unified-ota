@@ -270,7 +270,10 @@ void OtaProcessor::endOta() {
         return;
     }
 
+    INFO("Marking NVRAM as updated.");
+    nvs_mark_updated();
     nvs_reset_meshtastic_counter();
+
     sendResponse(RESP_OK);
     INFO("OTA Success. Flagging reboot.");
     _reboot_required = true;
