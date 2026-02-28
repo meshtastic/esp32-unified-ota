@@ -45,6 +45,7 @@ void wifi_connect(const nvs_config_t *config) {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
+    ESP_ERROR_CHECK(esp_wifi_set_max_tx_power(34));
     EventBits_t bits = xEventGroupWaitBits(event_group_handle, BIT_CONNECTED | BIT_FAIL, pdFALSE, pdFALSE, portMAX_DELAY);
     if (bits & BIT_FAIL) FAIL("Failed to connect to WiFi");
 }
