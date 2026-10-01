@@ -1,5 +1,7 @@
 # ESP32 Unified Updater (BLE and WiFi)
 
+[![MemBrowse](https://membrowse.com/badge.svg)](https://membrowse.com/public/meshtastic/esp32-unified-ota)
+
 The is an AI-fueled fever dream mash-up of the the WiFi and BLE OTA updaters for ESP-32
 
 - BLE Updater: https://github.com/meshtastic/firmware-ota

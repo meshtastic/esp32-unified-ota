@@ -39,22 +39,36 @@ jobs:
       version: ${{ steps.version.outputs.version }}
 
   build:
+    name: build (${{ matrix.pio_env }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        pio_env: 
-          - esp32
-          - esp32s2
-          - esp32s3
-          - esp32c3
-          - esp32c6
-          # - esp32c5
+        # MemBrowse: map file is named after the CMake project (see CMakeLists.txt);
+        # skip_sections are ESP-IDF NOBITS placeholders that reserve address space, not memory
+        include:
+          - pio_env: esp32
+            map_file: MeshtasticOTA.map
+            skip_sections: .flash.rodata_noload
+          - pio_env: esp32s2
+            map_file: MeshtasticOTA-WiFi.map
+            skip_sections: .flash.rodata_noload .dram0_reserved_for_iram
+          - pio_env: esp32s3
+            map_file: MeshtasticOTA.map
+            skip_sections: .flash_rodata_dummy .ext_ram.dummy .flash.rodata_noload .dram0.dummy
+          - pio_env: esp32c3
+            map_file: MeshtasticOTA-BLE.map
+            skip_sections: .flash_rodata_dummy .dram0.dummy
+          - pio_env: esp32c6
+            map_file: MeshtasticOTA-BLE.map
+            skip_sections: .flash_rodata_dummy
     # Ignore failures for esp32c3 and esp32c6 for now
     continue-on-error: ${{ matrix.pio_env == 'esp32c3' || matrix.pio_env == 'esp32c6' }}
     steps:
       - uses: actions/checkout@v6
         with:
+          # MemBrowse needs the parent commit
+          fetch-depth: 2
           submodules: recursive
           ref: ${{github.event.pull_request.head.ref}}
           repository: ${{github.event.pull_request.head.repo.full_name}}
@@ -81,6 +95,24 @@ jobs:
         with:
           name: ${{ matrix.pio_env }}
           path: .pio/build/mt-${{ matrix.pio_env }}-ota.bin
+
+      # Only on push/pull_request: a workflow_dispatch commit was already reported
+      # on push, and a MemBrowse failure must not block the release job
+      - name: MemBrowse memory report
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        uses: membrowse/membrowse-action@v1
+        with:
+          target_name: ${{ matrix.pio_env }}
+          elf: .pio/build/${{ matrix.pio_env }}/firmware.elf
+          ld: >
+            .pio/build/${{ matrix.pio_env }}/memory.ld
+            .pio/build/${{ matrix.pio_env }}/sections.ld
+          map_file: .pio/build/${{ matrix.pio_env }}/${{ matrix.map_file }}
+          skip_sections: ${{ matrix.skip_sections }}
+          api_key: ${{ secrets.MEMBROWSE_API_KEY }}
+          verbose: INFO
+          # Uncomment to allow CI to pass even when memory budgets are exceeded
+          # dont_fail_on_alerts: true
 
   release:
     runs-on: ubuntu-slim
