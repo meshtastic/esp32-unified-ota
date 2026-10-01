@@ -4,7 +4,7 @@
 #include <functional>
 #include "esp_ota_ops.h"
 #include "esp_partition.h"
-#include "mbedtls/sha256.h"
+#include "psa/crypto.h"
 
 // Callback type for sending responses (e.g. "OK\n", "ERR...")
 typedef std::function<void(const char* data, size_t len)> ota_sender_t;
@@ -43,7 +43,7 @@ private:
     size_t _firmware_size;
     size_t _total_received;
     uint8_t _expected_hash[32];
-    mbedtls_sha256_context _sha_ctx;
+    psa_hash_operation_t _sha_op;
 
     char _cmd_buffer[256];
     size_t _cmd_len;

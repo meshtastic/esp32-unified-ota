@@ -133,7 +133,7 @@ If the device replies with `ERR`, the remainder of the line describes the error.
 
 ## Building with esp-idf
 
-- Install esp-idf and activate the environment
+- Install esp-idf (v6.1 or later) and activate the environment
 
 - Clean build with the following commands:
 
