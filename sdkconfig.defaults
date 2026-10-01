@@ -36,6 +36,9 @@ CONFIG_COMPILER_CXX_RTTI=n
 # Disable stack smashing (saves space)
 CONFIG_COMPILER_STACK_CHECK_MODE_NONE=y
 
+# RISC-V only (C3/C6): library calls for register save/restore (-msave-restore)
+CONFIG_COMPILER_SAVE_RESTORE_LIBCALLS=y
+
 # LTO + linker tweaks
 CONFIG_COMPILER_LTO=y
 CONFIG_COMPILER_ORPHAN_SECTIONS_PLACE=y
@@ -49,6 +52,8 @@ CONFIG_LOG_DEFAULT_LEVEL=0
 CONFIG_LOG_MAXIMUM_LEVEL=0
 CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
 CONFIG_LOG_IN_IRAM=n
+# No esp_err_to_name() string table (errors print as hex codes)
+CONFIG_ESP_ERR_TO_NAME_LOOKUP=n
 
 # ---------------------------------------------------------------
 # 3. Bluetooth / NimBLE (Minimal Peripheral OTA Server)
@@ -130,6 +135,8 @@ CONFIG_LWIP_TCP_SND_BUF_DEFAULT=2144
 CONFIG_LWIP_DHCPS=n
 CONFIG_LWIP_IP_FORWARD=n
 CONFIG_LWIP_STATS=n
+CONFIG_LWIP_DNS_SUPPORT_MDNS_QUERIES=n
+CONFIG_LWIP_NETIF_LOOPBACK=n
 
 # ---------------------------------------------------------------
 # 5. mbedTLS / Crypto (SHA256/AES Only - No TLS/HTTPS/EC)
@@ -177,16 +184,13 @@ CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=0
 CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=0
 
 # Kill EC (all curves; WiFi AES-only ok)
+# (Curves under 250 bits no longer exist as of Mbed TLS 4 / IDF 6.0)
 CONFIG_MBEDTLS_ECP_C=n
 CONFIG_MBEDTLS_ECDH_C=n
 CONFIG_MBEDTLS_ECDSA_C=n
-CONFIG_MBEDTLS_ECP_DP_SECP192R1_ENABLED=n
-CONFIG_MBEDTLS_ECP_DP_SECP224R1_ENABLED=n
 CONFIG_MBEDTLS_ECP_DP_SECP256R1_ENABLED=n
 CONFIG_MBEDTLS_ECP_DP_SECP384R1_ENABLED=n
 CONFIG_MBEDTLS_ECP_DP_SECP521R1_ENABLED=n
-CONFIG_MBEDTLS_ECP_DP_SECP192K1_ENABLED=n
-CONFIG_MBEDTLS_ECP_DP_SECP224K1_ENABLED=n
 CONFIG_MBEDTLS_ECP_DP_SECP256K1_ENABLED=n
 CONFIG_MBEDTLS_ECP_DP_BP256R1_ENABLED=n
 CONFIG_MBEDTLS_ECP_DP_BP384R1_ENABLED=n
@@ -198,13 +202,15 @@ CONFIG_MBEDTLS_ECDSA_DETERMINISTIC=n
 # ---------------------------------------------------------------
 # 5b. Disable TLS Pullers / Selects (ESP-TLS, ProtoComm, Extras)
 # ---------------------------------------------------------------
-CONFIG_MBEDTLS_TLS_DISABLED=y
 CONFIG_MBEDTLS_CLIENT_SSL_SESSION_TICKETS=n
 CONFIG_MBEDTLS_SERVER_SSL_SESSION_TICKETS=n
 
 # No ESP-TLS (plain HTTP OTA if needed; linker strips HTTPS)
+# IDF 6: ESP_TLS_USING_MBEDTLS selects MBEDTLS_TLS_ENABLED, so pick the other
+# choice to keep TLS off (nothing links ESP-TLS, so no stack is registered)
 CONFIG_ESP_TLS=n
 CONFIG_ESP_TLS_USING_MBEDTLS=n
+CONFIG_ESP_TLS_CUSTOM_STACK=y
 
 # ProtoComm: v0 only (insecure/no-TLS; GATT OTA direct for Meshtastic)
 CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_0=y
@@ -233,12 +239,22 @@ CONFIG_MBEDTLS_SHA1_C=n
 CONFIG_MBEDTLS_GCM_C=n
 CONFIG_MBEDTLS_CCM_C=n
 
+# IDF 6 / PSA Crypto: the PSA core references every enabled algorithm, so
+# unused ones are linked even if nothing calls them
+CONFIG_MBEDTLS_SHA384_C=n
+# RSA only serves TLS/X.509 here (src/mbedtls_user_config.h covers what IDF misses)
+CONFIG_MBEDTLS_RSA_C=n
+CONFIG_MBEDTLS_PKCS1_V15=n
+CONFIG_MBEDTLS_PKCS1_V21=n
+CONFIG_MBEDTLS_X509_RSASSA_PSS_SUPPORT=n
+CONFIG_MBEDTLS_CIPHER_MODE_XTS=n
+CONFIG_MBEDTLS_CIPHER_MODE_CFB=n
+CONFIG_MBEDTLS_CIPHER_MODE_OFB=n
+CONFIG_MBEDTLS_SELF_TEST=n
+
 # ---------------------------------------------------------------
 # 6. System / FreeRTOS (Minimal Kernel)
 # ---------------------------------------------------------------
-# Nano newlib (no float printf)
-CONFIG_NEWLIB_NANO_FORMAT=y
-
 # Panic: Reboot only (no GDB/decode)
 CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y
 CONFIG_ESP_SYSTEM_PANIC_GDBSTUB=n
@@ -264,13 +280,20 @@ CONFIG_ESP_TIMER_IN_IRAM=n
 CONFIG_ESP_WIFI_SOFTAP_SUPPORT=n
 CONFIG_ESP_WIFI_MESH_SUPPORT=n
 CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n
+# IDF 6.1 also exposes the Wi-Fi Remote menu on native targets; its enterprise
+# option defaults on and selects MBEDTLS_TLS_ENABLED
+CONFIG_WIFI_RMT_ENTERPRISE_SUPPORT=n
 CONFIG_ESP_WIFI_ENABLE_WPA3_SAE=n
 CONFIG_ESP_WIFI_ENABLE_WPA3_OWE_STA=n
 CONFIG_ESP_WIFI_ENABLE_SAE_PK=n
+CONFIG_ESP_WIFI_GMAC_SUPPORT=n
+# STA config is set from our NVS keys on every boot; don't persist it
+CONFIG_ESP_WIFI_NVS_ENABLED=n
 
 # PHY: NVS-only calibration
 CONFIG_ESP_PHY_INIT_DATA_IN_PARTITION=n
 CONFIG_ESP_PHY_CALIBRATION_AND_DATA_STORAGE=y
+CONFIG_ESP_PHY_ENABLE_VERSION_PRINT=n
 
 # Partition tweaks
 CONFIG_PARTITION_TABLE_MD5=n
@@ -291,8 +314,7 @@ CONFIG_HTTPD_MAX_URI_LEN=0
 CONFIG_HTTPD_PURGE_BUF_LEN=0
 CONFIG_VFS_SEMIHOSTFS_MAX_MOUNT_POINTS=0
 CONFIG_VFS_INITIALIZE_DEV_NULL=n
-CONFIG_MQTT_PROTOCOL_311=n
-CONFIG_MQTT_TRANSPORT_SSL=n
+CONFIG_VFS_SUPPORT_DIR=n
 
 # ---------------------------------------------------------------
 # 9. Build / Bootloader Trims
@@ -302,6 +324,7 @@ CONFIG_APP_BUILD_BOOTLOADER=y
 CONFIG_BOOTLOADER_COMPILER_OPTIMIZATION_SIZE=y
 CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
 
+# Picolibc (IDF 6 default): smaller stdio than newlib-nano
 CONFIG_LIBC_PICOLIBC=y
 CONFIG_LIBC_NEWLIB=n
 

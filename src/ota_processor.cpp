@@ -18,7 +18,9 @@
 #define RESP_ERASING "ERASING\n"
 #define RESP_ACK "ACK\n" // No newline needed for BLE packets usually, but keeps it simple
 
-OtaProcessor::OtaProcessor() : _state(STATE_IDLE), _sender(nullptr), _reboot_required(false), _ack_enabled(false) {
+// _ota_handle and _sha_op must be initialized before reset() -> cleanup() touches them
+OtaProcessor::OtaProcessor() : _state(STATE_IDLE), _sender(nullptr), _reboot_required(false), _ack_enabled(false),
+                               _ota_handle(0), _sha_op(psa_hash_operation_init()) {
     reset();
 }
 
@@ -57,7 +59,7 @@ void OtaProcessor::cleanup(bool success) {
         if (!success) esp_ota_abort(_ota_handle);
         _ota_handle = 0;
     }
-    mbedtls_sha256_free(&_sha_ctx);
+    psa_hash_abort(&_sha_op);
     _firmware_size = 0;
     _total_received = 0;
 }
@@ -192,8 +194,12 @@ void OtaProcessor::handleOtaStart(const char* args) {
         return;
     }
 
-    mbedtls_sha256_init(&_sha_ctx);
-    mbedtls_sha256_starts(&_sha_ctx, 0); 
+    if (psa_hash_setup(&_sha_op, PSA_ALG_SHA_256) != PSA_SUCCESS) {
+        INFO("Hash setup failed");
+        sendResponse("ERR Hash Update\n");
+        reset();
+        return;
+    }
 
     _state = STATE_DOWNLOADING;
     _total_received = 0;
@@ -201,7 +207,7 @@ void OtaProcessor::handleOtaStart(const char* args) {
 }
 
 void OtaProcessor::handleBinaryChunk(const uint8_t* data, size_t len) {
-    if (mbedtls_sha256_update(&_sha_ctx, data, len) != 0) {
+    if (psa_hash_update(&_sha_op, data, len) != PSA_SUCCESS) {
         INFO("Hash update failed");
         sendResponse("ERR Hash Update\n");
         reset();
@@ -239,11 +245,13 @@ void OtaProcessor::handleBinaryChunk(const uint8_t* data, size_t len) {
 }
 
 void OtaProcessor::endOta() {
-    uint8_t calculated_hash[32];
-    mbedtls_sha256_finish(&_sha_ctx, calculated_hash);
-    
+    uint8_t calculated_hash[32] = {0};
+    size_t hash_len = 0;
+    psa_status_t hash_status = psa_hash_finish(&_sha_op, calculated_hash, sizeof(calculated_hash), &hash_len);
+
     // Compare Calculated vs Expected (which we verified matches NVS in handleOtaStart)
-    if (memcmp(calculated_hash, _expected_hash, 32) != 0) {
+    // A failed finish is treated as a mismatch so the partition is never left bootable
+    if (hash_status != PSA_SUCCESS || memcmp(calculated_hash, _expected_hash, 32) != 0) {
         corrupt_partition(_target_partition);
         INFO("Hash Mismatch");
         print_hash("Calc: ", calculated_hash);
