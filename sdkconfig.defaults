@@ -235,7 +235,11 @@ CONFIG_MBEDTLS_PEM_WRITE_C=n
 CONFIG_MBEDTLS_X509_CRL_PARSE_C=n
 CONFIG_MBEDTLS_X509_CSR_PARSE_C=n
 CONFIG_MBEDTLS_SHA512_C=n
-CONFIG_MBEDTLS_SHA1_C=n
+# WPA2-PSK needs HMAC-SHA1 for the PTK and EAPOL MIC. On IDF 6, leaving
+# this off also undefs PSA_WANT_ALG_SHA_1 and the hardware SHA-1 accelerator,
+# so sha1_vector() fails and the station deauths immediately. Hardware SHA
+# still performs the hash; this only keeps the algorithm enabled.
+CONFIG_MBEDTLS_SHA1_C=y
 CONFIG_MBEDTLS_GCM_C=n
 CONFIG_MBEDTLS_CCM_C=n
 
@@ -334,3 +338,16 @@ CONFIG_ZB_ENABLED=n
 CONFIG_IEEE802154_ENABLED=n
 CONFIG_SOC_MCPWM_SUPPORTED=n
 CONFIG_ETM_ENABLE_DEBUG_LOG=n
+
+# ---------------------------------------------------------------
+# 10. MMU page size (match Meshtastic firmware: 64 KB)
+# ---------------------------------------------------------------
+# IDF 6.1 defaults the flash-size choice to 2 MB. On the C6 that selects
+# 32 KB MMU pages, and esp_image_verify then rejects the image on firmware
+# built with 64 KB pages. 4 MB matches [common] board_build.flash_size.
+# Do not raise this to 8 MB or 16 MB: a header larger than the chip is
+# rejected on the 4 MB LilyGo T3-C6. A 4 MB header still boots on 16 MB.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_MMU_PAGE_SIZE_64KB=y
+CONFIG_MMU_PAGE_MODE="64KB"
+CONFIG_MMU_PAGE_SIZE=0x10000
