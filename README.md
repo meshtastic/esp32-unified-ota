@@ -118,18 +118,32 @@ If the device replies with `ERR`, the remainder of the line describes the error.
 
 ## Building with PlatformIO
 
-- PlatformIO should build with an esp32 or esp32s3 environment.
+Five environments produce one loader image per chip. CI and the release publish those five binaries (`mt-<chip>-ota.bin`). A bare `pio run` builds the same five.
 
-  ```
-  pio run -e esp32s3 -t upload
-  ```
-  or
-  ```
-  pio run -e esp32 -t upload
-  ```
+| Env | Board | Transports | `pio upload` address |
+| --- | --- | --- | --- |
+| `esp32` | `esp32dev` | BLE + WiFi | `0x260000` |
+| `esp32s2` | `esp32-s2-saola-1` | WiFi only | `0x260000` |
+| `esp32s3` | `esp32-s3-devkitc-1` | BLE + WiFi | `0x650000` |
+| `esp32c3` | `esp32-c3-devkitm-1` | BLE only | `0x260000` |
+| `esp32c6` | `esp32-c6-devkitm-1` | BLE only | `0x260000` |
 
-- A custom `uplaod_command` in the ini file will upload only the OTA loader into the
-  proper partion.
+`pio run -e <chip> -t upload` writes that address and does not write a partition table. Other boards use the same `.pio/build/<chip>/firmware.bin` at the `ota_1` offset of the partition table the firmware was built with:
+
+| Partition table | `ota_1` |
+| --- | --- |
+| `partition-table.csv` | `0x260000` |
+| `partition-table-t3s3.csv` | `0x2A0000` |
+| `default_8MB.csv` | `0x340000` |
+| `partition-table-8MB.csv` | `0x5D0000` |
+| `default_16MB.csv` | `0x650000` |
+
+T3-S3 firmware that uses `partition-table-t3s3.csv` loads the loader at `0x2A0000`. A device still on the older 4 MB map has `ota_1` at `0x260000` until a full firmware flash.
+
+```
+pio run -e esp32s3
+esptool.py write_flash 0x2A0000 .pio/build/esp32s3/firmware.bin
+```
 
 ## Building with esp-idf
 
@@ -144,17 +158,7 @@ idf.py set-target esp32s3
 idf.py build
 ```
 
-- Install it on a 4MB board:
-
-  `esptool.py --port /dev/tty.usbmodem21101 write_flash 0x260000 ./build/OTA-WiFi.bin`
-
-- Install it on a 8MB board:
-
-  `esptool.py --port /dev/tty.usbmodem21101 write_flash 0x5D0000 ./build/OTA-WiFi.bin`
-  
-- Install it on a 16MB board:
-
-  `esptool.py --port /dev/tty.usbmodem21101 write_flash 0x650000 ./build/OTA-WiFi.bin`
+- Install `build/OTA-WiFi.bin` at the `ota_1` offset in the table above. The image header is 4 MB. `0x260000` is `partition-table.csv`, not every 4 MB board. `0x5D0000` is `partition-table-8MB.csv`. `0x650000` is `default_16MB.csv`.
 
 
 ## Using this during development
