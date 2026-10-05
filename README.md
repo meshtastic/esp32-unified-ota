@@ -109,7 +109,7 @@ If the device replies with `ERR`, the remainder of the line describes the error.
 *   `ERR Invalid Format`: Arguments for `OTA` command were malformed.
 *   `ERR Hash Rejected (NVS Mismatch)`: The hash provided by the client does not match the hash pinned in the device NVS.
 *   `ERR No Partition`: Could not find a valid OTA_0 or OTA_1 partition.
-*   `ERR OTA Begin Failed`: Hardware error initializing flash write.
+*   `ERR OTA Begin Failed (<esp_err>)`: `esp_ota_begin` refused the image. The number is the ESP-IDF error code.
 *   `ERR Hash Update`: Internal crypto engine error.
 *   `ERR Flash Write`: Hardware error writing to flash.
 *   `ERR Size Mismatch`: Client sent more bytes than declared in `OTA` command.
