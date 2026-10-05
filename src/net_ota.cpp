@@ -12,26 +12,37 @@
 #define OTA_PORT 3232
 #define BROADCAST_INTERVAL_SEC 1
 
+// File-scope statics — moved off the main task stack (3584 B per sdkconfig) to relieve
+// stack pressure that seem to cause a russian roulette of StackOverflow panics during WiFi OTA on
+// ESP32-S3 (issue #8). BLE OTA already does this with `static OtaProcessor otaProcessor;`
+// at file scope (see ble_ota.cpp:33) — this mirrors that convention. Per-connection state
+// (client_sock, client_addr, client_addr_len, fd_set, timeval) STAYS on the stack so it
+// resets cleanly for each new client. (In case there is a reconnect or something, just in case)
+static int udp_sock = -1;
+static int listen_sock = -1;
+static struct sockaddr_in broadcast_addr;
+static char discovery_msg[64];
+static uint8_t rx_buffer[1024];
+static OtaProcessor otaProcessor;
+
 void start_network_ota_process(const nvs_config_t *config) {
     INFO("Starting Network Listener...");
 
-    int udp_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+    udp_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
     if (udp_sock < 0) FAIL("Failed to create UDP socket");
     int broadcast = 1;
     setsockopt(udp_sock, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast));
 
-    struct sockaddr_in broadcast_addr;
     memset(&broadcast_addr, 0, sizeof(broadcast_addr));
     broadcast_addr.sin_family = AF_INET;
     broadcast_addr.sin_port = htons(OTA_PORT);
     broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 
-    char discovery_msg[64];
     char* devName = getDeviceName();
     const esp_app_desc_t *app_desc = esp_app_get_description();
     snprintf(discovery_msg, sizeof(discovery_msg), "%s %s", devName, app_desc->version);
 
-    int listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
+    listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
     if (listen_sock < 0) FAIL("Failed to create TCP socket");
     int reuse = 1;
     setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
@@ -46,9 +57,6 @@ void start_network_ota_process(const nvs_config_t *config) {
     if (listen(listen_sock, 1) < 0) FAIL("TCP Listen failed");
 
     INFO("Listening on TCP port %d", OTA_PORT);
-
-    OtaProcessor otaProcessor;
-    uint8_t rx_buffer[1024];
 
     // Set the expencted hash from the NVS
     otaProcessor.setNvramExpectedHash(config->ota_hash);
