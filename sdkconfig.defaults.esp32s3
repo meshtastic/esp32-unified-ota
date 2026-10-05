@@ -1,0 +1,10 @@
+# ESP32-S3 console. Applied after sdkconfig.defaults.
+#
+# T3-S3 USB-C is native USB on GPIO19/20, not UART0. The main firmware
+# owns that port with TinyUSB. A secondary USB-Serial-JTAG console never
+# calls usb_serial_jtag_driver_install(), so the PHY stays off and the
+# host sees no serial device after the soft reboot into this loader.
+# The ROM download mode uses this same controller (the non-TinyCDC port).
+CONFIG_ESP_CONSOLE_UART_DEFAULT=n
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y

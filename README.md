@@ -125,6 +125,8 @@ Five environments produce one loader image per chip. CI and the release publish 
 | `esp32` | `esp32dev` | BLE + WiFi | `0x260000` |
 | `esp32s2` | `esp32-s2-saola-1` | WiFi only | `0x260000` |
 | `esp32s3` | `esp32-s3-devkitc-1` | BLE + WiFi | `0x650000` |
+
+The ESP32-S3 image also applies `sdkconfig.defaults.esp32s3`, so the console is USB-Serial/JTAG. The T3-S3 USB-C jack is native USB on GPIO19/20, not UART0.
 | `esp32c3` | `esp32-c3-devkitm-1` | BLE only | `0x260000` |
 | `esp32c6` | `esp32-c6-devkitm-1` | BLE only | `0x260000` |
 
