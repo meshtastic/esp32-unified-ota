@@ -6,6 +6,7 @@
 #include "freertos/task.h"
 #include "freertos/stream_buffer.h"
 #include "esp_mac.h"
+#include "esp_random.h"
 #include "esp_task_wdt.h"
 #include "NimBLEDevice.h"
 #include <string>
@@ -19,6 +20,33 @@
 // Buffer size: Enough to hold a few MTU packets. 
 // MTU ~517. 4KB buffer provides enough slack for flash write latency.
 #define STREAM_BUFFER_SIZE 4096 
+
+// The phone bonded to the main firmware at this chip's public address and
+// cached that GATT database. This loader serves a different database, so the
+// phone closes the link (HCI 0x13) when the OTA service is missing from the
+// cache. A static random address makes this boot a new peripheral. The app
+// scans for the OTA service UUID, not the address it used a moment ago.
+static void useOtaRandomAddress() {
+    uint8_t addr[6];
+    for (int attempt = 0; attempt < 5; attempt++) {
+        esp_fill_random(addr, sizeof(addr));
+        addr[5] = (addr[5] & 0x3F) | 0xC0; // static random
+        int ones = 0;
+        for (int i = 0; i < 5; i++) {
+            ones += __builtin_popcount(addr[i]);
+        }
+        ones += __builtin_popcount(addr[5] & 0x3F);
+        if (ones == 0 || ones == 46) {
+            continue; // NimBLE rejects an all-0 or all-1 random part
+        }
+        if (NimBLEDevice::setOwnAddr(addr) && NimBLEDevice::setOwnAddrType(BLE_OWN_ADDR_RANDOM)) {
+            INFO("BLE address %02X:%02X:%02X:%02X:%02X:%02X",
+                 addr[5], addr[4], addr[3], addr[2], addr[1], addr[0]);
+            return;
+        }
+    }
+    INFO("BLE random address failed; using the public address");
+}
 
 static BLEServer *pServer = NULL;
 static BLECharacteristic *pTxCharacteristic;
@@ -101,6 +129,7 @@ void ble_ota_task(void *param) {
     
     const char *devName = getDeviceName();
     NimBLEDevice::init(std::string{devName});
+    useOtaRandomAddress();
     NimBLEDevice::setMTU(517); 
     NimBLEDevice::setPower(ESP_PWR_LVL_P9); 
     

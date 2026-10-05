@@ -15,9 +15,7 @@ The is an AI-fueled fever dream mash-up of the the WiFi and BLE OTA updaters for
 
   Key Security Feature: The device strictly enforces firmware integrity. The SHA-256 hash of the intended firmware must be pre-provisioned in the device's Non-Volatile Storage (NVS) before the update begins. The client must provide this exact hash during the handshake, and the final downloaded binary must match it.
 
-  Meshtastic's design implicitly trusts the network.  This NVS hashing system is intended for future compatibility.  Should the firmware TCP connection be secured in some way, then the NVS hash can only be applied by a trusted device.  The OTA loader will then only accept a firmware with the proper hash.  
-
-  If there is a hash mismatch, the OTA loader will intentionally corrupt the header of the partition to prevent untrusted or bad code from executing.
+  The main firmware writes that hash from the admin session that requested the update, then reboots into the loader. The loader boots a new image only when the bytes written to flash match it. A hash mismatch corrupts the new image header so the bootloader will not run it. The BLE link below is unencrypted; the hash, not the link, decides which image is allowed.
 
 ### 2. Transport Layers
 
@@ -34,6 +32,8 @@ The is an AI-fueled fever dream mash-up of the the WiFi and BLE OTA updaters for
     *   **TX (Notify):** `62ec0272-3ec5-11eb-b378-0242ac130003`
         *   Used by Device to send responses (`OK`, `ERR`, `ACK`, `ERASING`).
 *   **Flow:** Asynchronous with application-level ACK. The client writes a chunk, then waits for an `ACK` notification before sending the next.
+*   **Address:** Each OTA boot advertises a new static random address. The loader does not reuse the main firmware's public address or its BLE bond, so the phone treats it as a new peripheral and connects without encryption. The phone finds the loader by the service UUID above. Bonds already stored for the main firmware stay in NVS and apply again when that firmware boots on the public address.
+*   **Who may flash:** Anyone in range can connect to the open advertisement and can see the transfer. They can complete an update only by sending the hash already stored in NVS and bytes that hash to that value. Any other image is rejected. Holding the single connection can keep the phone off the loader; it does not authorize a different firmware.
 
 ---
 
@@ -109,7 +109,7 @@ If the device replies with `ERR`, the remainder of the line describes the error.
 *   `ERR Invalid Format`: Arguments for `OTA` command were malformed.
 *   `ERR Hash Rejected (NVS Mismatch)`: The hash provided by the client does not match the hash pinned in the device NVS.
 *   `ERR No Partition`: Could not find a valid OTA_0 or OTA_1 partition.
-*   `ERR OTA Begin Failed`: Hardware error initializing flash write.
+*   `ERR OTA Begin Failed (<esp_err>)`: `esp_ota_begin` refused the image. The number is the ESP-IDF error code.
 *   `ERR Hash Update`: Internal crypto engine error.
 *   `ERR Flash Write`: Hardware error writing to flash.
 *   `ERR Size Mismatch`: Client sent more bytes than declared in `OTA` command.

@@ -189,8 +189,12 @@ void OtaProcessor::handleOtaStart(const char* args) {
     INFO("Starting OTA. Size: %u, Part: 0x%lx", (unsigned int)_firmware_size, _target_partition->address);
 
 
-    if (esp_ota_begin(_target_partition, _firmware_size, &_ota_handle) != ESP_OK) {
-        sendResponse("ERR OTA Begin Failed\n");
+    esp_err_t begin_err = esp_ota_begin(_target_partition, _firmware_size, &_ota_handle);
+    if (begin_err != ESP_OK) {
+        INFO("OTA begin failed: %s (%d), image %u, part 0x%lx size 0x%lx",
+             esp_err_to_name(begin_err), (int)begin_err, (unsigned)_firmware_size,
+             _target_partition->address, (unsigned long)_target_partition->size);
+        sendResponse("ERR OTA Begin Failed (%d)\n", (int)begin_err);
         return;
     }
 
