@@ -1,0 +1,6 @@
+# Link limit for the loader image. Upload writes firmware.bin only and does
+# not flash this table. The app slot is the smallest firmware ota_1 (640 KiB).
+# Name,   Type, SubType, Offset,  Size, Flags
+nvs,      data, nvs,     0x009000, 0x005000,
+otadata,  data, ota,     0x00e000, 0x002000,
+app,      app,  ota_0,   0x010000, 0x0A0000,

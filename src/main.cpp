@@ -16,6 +16,11 @@
 #include "ble_ota.h"
 #endif
 #include "utils.h"
+#include "sdkconfig.h"
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+#include "driver/usb_serial_jtag.h"
+#include "driver/usb_serial_jtag_vfs.h"
+#endif
 #define TAG "MAIN"
 
 #define NO_REBOOT_OTA 0
@@ -23,6 +28,16 @@
 #define OTA_WIFI 2
 
 extern "C" void app_main(void) {
+
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+    // Primary USB-Serial-JTAG selects the port, but IDF only installs the
+    // driver from the console REPL. Without this the PHY pads stay off and
+    // no serial device enumerates after a TinyUSB soft reboot.
+    usb_serial_jtag_driver_config_t usj_config = USB_SERIAL_JTAG_DRIVER_CONFIG_DEFAULT();
+    if (usb_serial_jtag_driver_install(&usj_config) == ESP_OK) {
+        usb_serial_jtag_vfs_use_driver();
+    }
+#endif
 
     esp_netif_init();
     esp_event_loop_create_default();
