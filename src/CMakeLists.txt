@@ -14,12 +14,13 @@ set(ota_reqs
     nvs_flash
     app_update
     spi_flash
+    mbedtls
 )
 
 # WiFi OTA
 if(ENABLE_WIFI_OTA)
     list(APPEND ota_srcs "wifi_app.cpp" "net_ota.cpp")
-    list(APPEND ota_reqs esp_wifi esp_event esp_netif esp_phy lwip mbedtls)
+    list(APPEND ota_reqs esp_wifi esp_event esp_netif esp_phy lwip)
 endif()
 
 # BLE OTA
